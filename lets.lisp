@@ -18,8 +18,6 @@
 
 (in-package :lets)
 
-
-
 (eval-when (:compile-toplevel :load-toplevel :execute) 
   ;; cl-utils
   (declaim (inline memq))
@@ -33,19 +31,17 @@
   (defmacro putprop (sym val prop)
     `(setf (get ,sym ,prop) ,val))
   
-  
   (defmacro comment (&body body)
     (declare (ignore body))
     '(quote comment))
-  
+
   ;; 
   
   (defun GF (&rest args)
     "GFってなんだよ"
-    (format t "~{~A~^ ~}~%" (cdr args)))
+    (format T "~{~A~^ ~}~%" (cdr args)))
   
-                                        ;This is here for debugging only
-  
+  ;;This is here for debugging only
   
   (defun S-frag (&rest frag)
     (GF "{'('*_(1<*,>)A(1<*,>)+-6[<A(1<*->)>]')'}"
@@ -84,75 +80,53 @@
   )
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
-;This makes up a unique name.  The key requirement is that it must not
-;clash with anything at all.  These names are eliminated if possible
-;when we do simplifications.  (Eventually will be just gensym.)
+;;This makes up a unique name.  The key requirement is that it must not
+;;clash with anything at all.  These names are eliminated if possible
+;;when we do simplifications.  (Eventually will be just gensym.)
 
-(defvar S-counter 0 "LETS gensym counter")
+  (defun s-new-var (root)
+    (gensym (string root)))
 
-(defun s-new-var (root)
-  (let* ((root-list (reverse (coerce (string root) 'list)))
-         new)
-    (prog ()
-      L (cond ((or (< (char-code (car root-list)) (char-code #\0)) (> (char-code (car root-list)) (char-code #\9))) ;char-code?
-               (return nil)))
-        (setq root-list (cdr root-list))
-        (go L))
-    (setq S-counter (1+ S-counter))
-    (setq new (nreconc root-list
-                       (let ((*read-base* 10) );(*nopoint T)
-                         (coerce (format nil "~A" S-counter) 'list))))
-    (make-symbol (apply #'concatenate 'string (list new)))))
-
-;This is called to signal internal errors.
-
-(defvar S-ERROR nil "holds debugging info when error hit.")
-(declaim (special prinendline))
-(defvar prinendline)
-
-(defun S-B (&rest values)
-  (setq S-ERROR `("Internal LetS BUG:" ., values))
-  (let (prinlevel prinlength prinendline)
-    (error "~a" S-ERROR)))
-
-;makes up for dumb lispm maclisp incompatability.
-
-(defmacro s-consp (x)
-  `(consp ,x))
-
-;Just makes it easy to robustly test the car.
-
-(defmacro s-eq-car (item atom)
-  (cond ((symbolp item) `(and (s-consp ,item) (eq (car ,item) ,atom)))
-        (T (let* ((s-item (gensym)))
-             `(let* ((,s-item ,item)) (s-eq-car ,s-item ,atom))))))
-
-;This tests whether a thing is a variable name.
-
-
+  ;;This is called to signal internal errors.
+  (defvar S-ERROR nil "holds debugging info when error hit.")
+  (declaim (special prinendline))
+  (defvar prinendline)
+  
+  (defun S-B (&rest values)
+    (setq S-ERROR `("Internal LetS BUG:" ., values))
+    (let (prinlevel prinlength prinendline)
+      (error "~a" S-ERROR)))
+  
+  ;;Just makes it easy to robustly test the car.
+  (defmacro s-eq-car (item atom)
+    (cond ((symbolp item) `(and (consp ,item) (eq (car ,item) ,atom)))
+          (T (let* ((s-item (gensym)))
+               `(let* ((,s-item ,item)) (s-eq-car ,s-item ,atom))))))
+  
+  ;;This tests whether a thing is a variable name.
   (defun s-variablep (thing)
     (and thing (symbolp thing) (not (eq thing T))))
+  
+  (defun s-copyable-constant (thing)
+    (or (numberp thing)
+        (stringp thing)
+        (memq thing '(T NIL))
+        (s-eq-car thing 'function)
+        ;; 謎コード 'lambdaなら(lambda ()..)をみてる感じなので分かるのだが…
+        (and (consp thing) (string-equal (car thing) #\GREEK_SMALL_LETTER_LAMDA))
+        (and (s-eq-car thing 'quote) (symbolp (cadr thing)))))
+  )
 
-(defun s-copyable-constant (thing)
-  (or (numberp thing)
-      (stringp thing)
-      (memq thing '(T NIL))
-      (s-eq-car thing 'function)
-      (and (consp thing) (string-equal (car thing) #\GREEK_SMALL_LETTER_LAMDA))
-      (and (s-eq-car thing 'quote) (symbolp (cadr thing)))))
-;(char-code #\λ)
-;(print (code-char 955))
-)
+#||||
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
-;Here are basic constructor/deconstructors for the key internal form:
-;(S-frag args returns icode code1 code2 pcode ucode)
+  ;;Here are basic constructor/deconstructors for the key internal form:
+  ;;(S-frag args returns icode code1 code2 pcode ucode)
 
-(defmacro s-make-frag (a r i c1 c2 p u)
-  (s-check (list 'S-frag a r i c1 c2 p u))
-  `(s-check (list 'S-frag ,a ,r ,i ,c1 ,c2 ,p ,u)))
-
-
+  (defmacro s-make-frag (a r i c1 c2 p u)
+    (s-check (list 'S-frag a r i c1 c2 p u))
+    `(s-check (list 'S-frag ,a ,r ,i ,c1 ,c2 ,p ,u)))
+  
 (defmacro s-make-frag (a r i c1 c2 p u)
   `(s-check (list 'S-frag ,a ,r ,i ,c1 ,c2 ,p ,u)))
 
@@ -406,7 +380,7 @@
                  (setq first-output T))
         (&flag)
         (T (push (cons "bad kind" var) m)))
-      (or (cond ((eq kind '&flag) (s-consp info))
+      (or (cond ((eq kind '&flag) (consp info))
                 (T (null info)))
           (push (cons "bad info" var) m))
       (or (eq kind '&flag)
@@ -741,11 +715,11 @@
               (T (let* (to info)
                    (cond ((and (eq kind '&rest) (not (s-variablep item)))
                           (s-e item "destructuring &rest args not supported")))
-                   (cond ((or (eq kind '&input) (not (s-consp item)))
+                   (cond ((or (eq kind '&input) (not (consp item)))
                           (setq to item info nil))
                          (T (setq to (car item) info (cadr item))))
                    (cond ((eq kind '&aux)
-                          (cond ((and (s-consp item)
+                          (cond ((and (consp item)
                                       (or  info (eq kind '&sequence)))
                                  (s-arg-code to info mode)))
                           (s-args-convert kind mode to nil))
@@ -779,7 +753,7 @@
   (defun s-destructure-parse1 (list)
     (cond ((s-variablep list) (push list s-vars))
           ((null list))
-          ((not (s-consp list)) (s-e list "bad argument specification"))
+          ((not (consp list)) (s-e list "bad argument specification"))
           (T (s-destructure-parse1 (car list))
              (s-destructure-parse1 (cdr list))))))
 
@@ -811,7 +785,7 @@
            ((&end-unitary any) `(at-end #'(lambda () ,expr)))
            (&sequence  `(mapS #'(lambda () ,expr)))
            (none `(Rignore-no-ret (Gsequence ,expr)))))
-        ((and (s-consp expr) (s-frag-for (car expr)))
+        ((and (consp expr) (s-frag-for (car expr)))
          (let* ((ret-type (s-return-mode (s-frag-for (car expr)))))
            (cond ((and (null ret-type) (not (eq type 'none)))
                   (s-e expr "nested sequence function has no return value")))
@@ -847,8 +821,8 @@
                      (none (cond (has-at-end-rets 'at-end-no-ret)
                                  (T 'mapS-no-ret)))
                      (any (cond (has-at-end-rets 'at-end) (T 'mapS))))))
-             (cond ((and has-at-end-rets (s-consp expr) (eq (car expr) 'setq)
-                         (s-consp (cdr expr)) (memq (cadr expr) s-sequence-vars))
+             (cond ((and has-at-end-rets (consp expr) (eq (car expr) 'setq)
+                         (consp (cdr expr)) (memq (cadr expr) s-sequence-vars))
                     (s-e expr "attempt to assign at-end value to sequence var")))
              (s-parse1 `(,meta-fn ,fn .,params) type)))))
 )
@@ -913,7 +887,7 @@
     (s-process-args (s-args frag) other
       (cond ((eq kind '&input)
              (let* ((param (pop params))
-                    (frag? (and (s-consp param) (s-frag-for (car param)))))
+                    (frag? (and (consp param) (s-frag-for (car param)))))
                (cond (frag? (setq param (macroexpand param))))
                (setq frag (s-handle-input param var frag))
                (cond ((and frag? params-frag)
@@ -1214,12 +1188,12 @@
 ;positions at present.
 (EVAL-WHEN (:compile-toplevel :load-toplevel :execute)
   (defun s-tokenize1 (thing)
-    (cond ((or (not (s-consp thing))
+    (cond ((or (not (consp thing))
                (memq (car thing) '(quote function letS letS*))) thing)
           (T (do ((exprs thing (cdr exprs))
                   (result nil (cons (s-tokenize1 (car exprs)) result)))
-                 ((not (s-consp exprs)) (nreconc result exprs))
-               (cond ((and (s-consp exprs) (s-frag-for (car exprs)))
+                 ((not (consp exprs)) (nreconc result exprs))
+               (cond ((and (consp exprs) (s-frag-for (car exprs)))
                       (push exprs S-token-params)
                       (push (s-new-var 'V) S-token-args)
                       (return (nreconc result (car S-token-args))))))))))
@@ -1236,10 +1210,10 @@
 ;this looks at the car of every list to see if it is apply or funcall
 (EVAL-WHEN (:compile-toplevel :load-toplevel :execute)
   (defun s-find-applies (exprs)
-  (do ((e exprs (cdr e))) ((not (s-consp e)))
-    (cond ((or (not (s-consp (car e))) (memq (caar e) '(quote function))))
+  (do ((e exprs (cdr e))) ((not (consp e)))
+    (cond ((or (not (consp (car e))) (memq (caar e) '(quote function))))
           (T (prog ()
-               L (cond ((and (s-consp (car e)) (memq (caar e) '(apply funcall)))
+               L (cond ((and (consp (car e)) (memq (caar e) '(apply funcall)))
                         (let ((new (s-simplify-apply (car e))))
                           (cond ((not (eq new (car e)))
                                  (rplaca e new)
@@ -1268,13 +1242,13 @@
 
 (defun s-r1 (form read? write? vars)
   (cond ((and read? (memq form vars)) T)
-        ((or (not (s-consp form)) (s-eq-car form 'quote)) nil)
+        ((or (not (consp form)) (s-eq-car form 'quote)) nil)
         ((memq (car form) '(setq psetq))
          (do ((stuff (cdr form) (cddr stuff))) ((null stuff) nil)
            (cond ((or (and write? (memq (car stuff) vars))
                       (s-r1 (cadr stuff) read? write? vars))
                   (return T)))))
-        (T (do ((f form (cdr f))) ((not (s-consp f)) nil)
+        (T (do ((f form (cdr f))) ((not (consp f)) nil)
              (cond ((s-r1 (car f) read? write? vars) (return T)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1631,3 +1605,4 @@
         (&sequence item) (&end-unitary bool)
   () ((cond ((setq bool item) (done item)))) () () ())
 
+||||#
