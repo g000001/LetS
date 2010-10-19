@@ -117,7 +117,7 @@
         (and (s-eq-car thing 'quote) (symbolp (cadr thing)))))
   )
 
-#||||
+
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   ;;Here are basic constructor/deconstructors for the key internal form:
@@ -181,22 +181,43 @@
              (push (list var info) result))
             (T (push var result))))))
 
+(defun s-compress-arg-list (in-out arg-list)
+  (setq arg-list (sort arg-list #'kind-order :key #'car))
+  (do ((kind in-out)
+       (mode '&unitary)
+       (result)
+       (list arg-list (cdr list)))
+      ((null list) (nreverse result))
+    (destructuring-bind (this-kind this-mode var info)
+                        (car list)
+      (unless (eq kind this-kind)
+        (setq kind this-kind)
+        (push kind result))
+      (unless (eq mode this-mode)
+        (setq mode this-mode)
+        (push mode result))
+      (if (memq kind '(&optional &flag))
+          (push (list var info) result)
+          (push var result)))))
+
+
+
 (defun kind-order (x y)
   (memq y (cdr (memq x '(&input &optional &rest &aux &output &flag)))))
 
-  (defun s-expand-arg-list (in-out compressed-arg-list)
-    (do ((kind in-out) 
-         (mode '&unitary)
-         (result)
-         (list compressed-arg-list (cdr list)))
-        ((null list) (reverse result))
-      (cond ((memq (car list) '(&optional &rest &aux &flag))
-             (setq kind (car list)))
-            ((memq (car list) '(&unitary &sequence &end-unitary))
-             (setq mode (car list)))
-            ((memq kind '(&optional &flag))
-             (push (s-make-arg kind mode (caar list) (cadar list)) result))
-            (T (push (s-make-arg kind mode (car list) nil) result)))))
+(defun s-expand-arg-list (in-out compressed-arg-list)
+  (do ((kind in-out) 
+       (mode '&unitary)
+       (result)
+       (list compressed-arg-list (cdr list)))
+      ((null list) (reverse result))
+    (cond ((memq (car list) '(&optional &rest &aux &flag))
+           (setq kind (car list)))
+          ((memq (car list) '(&unitary &sequence &end-unitary))
+           (setq mode (car list)))
+          ((memq kind '(&optional &flag))
+           (push (s-make-arg kind mode (caar list) (cadar list)) result))
+          (T (push (s-make-arg kind mode (car list) nil) result)))))
 
 ;; test
 ;(s-expand-arg-list '&input '(foo bar baz))
@@ -445,7 +466,7 @@
                           `(&aux &sequence ,@args) body))
          (new-args (car ret))
          (new-body (cdr ret)))
-    `(s-lets ,(cddr new-args) ,@new-body)))
+    `(s-lets (,@(cddr new-args)) ,@new-body)))
 
 ;; test
 ;(Rlist (Elist '(1 2 3 4)))
@@ -457,8 +478,6 @@
   (letS* ((entry (Elist alist))
           (square (* (cdr entry) (cdr entry))))
     (Rlist (list (car entry) square))))
-
-(square-alist '((a . 10)))
 
 (defun square-alist (alist)
   (s-lets (entry square)
@@ -592,19 +611,17 @@
       frag
       )))
 
-(macroexpand-1 (car
+#|(macroexpand-1 (car
                 '((maps-no-ret #'(lambda (v1) (setq entry v1)) (elist alist))
                   (maps-no-ret
                     #'(lambda () (setq square (* (cdr entry) (cdr entry)))))
-                  (rlist (maps #'(lambda () (list (car entry) square)))))))
+                  (rlist (maps #'(lambda () (list (car entry) square)))))))|#
 
-
-
-(s-combine (list* '&aux '&sequence '(entry square)) 
+#|(s-combine (list* '&aux '&sequence '(entry square)) 
            '((maps-no-ret #'(lambda (v1) (setq entry v1)) (elist alist))
              (maps-no-ret
                #'(lambda () (setq square (* (cdr entry) (cdr entry)))))
-             (rlist (maps #'(lambda () (list (car entry) square))))))
+             (rlist (maps #'(lambda () (list (car entry) square))))))|#
 
 
 ;(print (s-expand-arg-list '&input '(&AUX &SEQUENCE A B)))
@@ -663,7 +680,7 @@
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defun s-parse-it (S-form form arglist body)
-    (setq s-counter 0)
+    (setq *gensym-counter* 0)
     (cond ((null body) (s-e "no body")))
     (let* ((ret (s-args-parse arglist))
            (argl (car ret))
@@ -1104,7 +1121,7 @@
 
 (defmacro s-desetq (to from)
   (cond ((s-variablep to) `(setq ,to ,from))
-        (T (let ((v (let ((S-counter 0)) (s-new-var 'list))) body)
+        (T (let ((v (let ((*gensym-counter* 0)) (s-new-var 'list))) body)
              (do ((tos to (cdr tos)))
                  ((null tos))
                (cond ((s-variablep tos)
@@ -1605,4 +1622,5 @@
         (&sequence item) (&end-unitary bool)
   () ((cond ((setq bool item) (done item)))) () () ())
 
+#||||
 ||||#
