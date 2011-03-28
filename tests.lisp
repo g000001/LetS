@@ -191,29 +191,20 @@
                          ;; output1
                          (&output mode1 var1 info1)
                          ;; output2
-                         (&output mode2 var3 info3)
+                         (&output mode2 var2 info2)
                          ))
-  (&INPUT MODE VAR 
-   &OPTIONAL (VAR INFO)
-   &REST VAR
-   &AUX VAR
-   &OUTPUT VAR MODE1 VAR1 MODE2 VAR3
-   &FLAG MODE (VAR INFO)))
-
+  (&INPUT MODE VAR
+          &OPTIONAL (VAR INFO)
+          &REST VAR
+          &AUX VAR
+          &OUTPUT VAR MODE1 VAR1 MODE2 VAR2
+          &FLAG MODE (VAR INFO)))
 
 (deftest :s-expand-arg-list.0
   (s-expand-arg-list '&input '(foo bar baz))
   ((&input &unitary foo nil)
    (&input &unitary bar nil)
    (&input &unitary baz nil)))
-
-
-(deftest :s-expand-arg-list.1
-  (s-expand-arg-list '&output '(foo bar baz))
-  ((&output &unitary foo nil)
-   (&output &unitary bar nil)
-   (&output &unitary baz nil)))
-
 
 ;(Rlist (Elist 1 2 3 4))
 
