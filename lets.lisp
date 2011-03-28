@@ -13,43 +13,43 @@
 ;/#M(declare (macros t) (mapex T))
 
 ;The only functions intended to be used by users are: DEFUNS, LETS*,
-;LETS, DONE, and the library sequence functions which are defined in 
+;LETS, DONE, and the library sequence functions which are defined in
 ;the file LETSLB.  These functions are globalized on lispm.
 
 (in-package :lets)
 
-(eval-when (:compile-toplevel :load-toplevel :execute) 
+(eval-when (:compile-toplevel :load-toplevel :execute)
   ;; cl-utils
   (declaim (inline memq))
   (defun memq (item lst)
     (member item lst :test #'eq))
-  
+
   (declaim (inline assq))
   (defun assq (item alist)
     (assoc item alist :test #'eq))
-  
+
   (defmacro putprop (sym val prop)
     `(setf (get ,sym ,prop) ,val))
-  
+
   (defmacro comment (&body body)
     (declare (ignore body))
     '(quote comment))
 
-  ;; 
-  
+  ;;
+
   (defun GF (&rest args)
     "GFってなんだよ"
     (format T "~{~A~^ ~}~%" (cdr args)))
-  
+
   ;;This is here for debugging only
-  
+
   (defun S-frag (&rest frag)
     (GF "{'('*_(1<*,>)A(1<*,>)+-6[<A(1<*->)>]')'}"
         's-frag (s-compress-arg-list '&input (s-args frag))
         (s-compress-arg-list '&output (s-returns frag)) (cdddr frag)))
-  
+
   (putprop 's-frag 'Gformat 'defun)
-  
+
   (defun s-debug ()
     (eval '(progn ;to make lispm happy
             (defun r fexpr (form)
@@ -66,7 +66,7 @@
             (GF "{'('*_(1<*,>)A(1<*,>)+-6[<A(1<*->)>]')'}"
             's-frag (s-compress-arg-list '&input (s-args frag))
             (s-compress-arg-list '&output (s-returns frag)) (cdddr frag)))|#
-            
+
             (defun (defunS :Gformat) (expr)
               (GF "(2*_*_(1<*,>)<A*>)" expr))
             (defun (s-defunS :Gformat) (expr)
@@ -91,22 +91,22 @@
   (defvar S-ERROR nil "holds debugging info when error hit.")
   (declaim (special prinendline))
   (defvar prinendline)
-  
+
   (defun S-B (&rest values)
     (setq S-ERROR `("Internal LetS BUG:" ., values))
     (let (prinlevel prinlength prinendline)
       (error "~a" S-ERROR)))
-  
+
   ;;Just makes it easy to robustly test the car.
   (defmacro s-eq-car (item atom)
     (cond ((symbolp item) `(and (consp ,item) (eq (car ,item) ,atom)))
           (T (let* ((s-item (gensym)))
                `(let* ((,s-item ,item)) (s-eq-car ,s-item ,atom))))))
-  
+
   ;;This tests whether a thing is a variable name.
   (defun s-variablep (thing)
     (and thing (symbolp thing) (not (eq thing T))))
-  
+
   (defun s-copyable-constant (thing)
     (or (numberp thing)
         (stringp thing)
@@ -126,7 +126,7 @@
   (defmacro s-make-frag (a r i c1 c2 p u)
     (s-check (list 'S-frag a r i c1 c2 p u))
     `(s-check (list 'S-frag ,a ,r ,i ,c1 ,c2 ,p ,u)))
-  
+
 (defmacro s-make-frag (a r i c1 c2 p u)
   `(s-check (list 'S-frag ,a ,r ,i ,c1 ,c2 ,p ,u)))
 
@@ -141,7 +141,7 @@
 (defmacro s-pcode       (f) `(caddr (cddddr ,f)))
 (defmacro s-ucode       (f) `(cadddr (cddddr ,f)))
 
-;A basic part of every fragment is its arg list.  This is a list of 
+;A basic part of every fragment is its arg list.  This is a list of
 ;quadruples [kind mode var info]  where
 ;KIND is one of &INPUT &OPTIONAL &REST &AUX for inputs
 ;    and one of &OUTPUT &FLAG for outputs
@@ -206,7 +206,7 @@
   (memq y (cdr (memq x '(&input &optional &rest &aux &output &flag)))))
 
 (defun s-expand-arg-list (in-out compressed-arg-list)
-  (do ((kind in-out) 
+  (do ((kind in-out)
        (mode '&unitary)
        (result)
        (list compressed-arg-list (cdr list)))
@@ -226,11 +226,11 @@
 
 ;This macro supports a usful brand of looping on lists.  It is much like
 ;mapcar, except that the way the body is specified is different.  It iterates
-;over a list (which must have a nil final cdr) and puts successive elements of 
+;over a list (which must have a nil final cdr) and puts successive elements of
 ;it in the variable ITEM.  It then conses up the results of the body
 ;except that results of NIL are ignored.  Also you can push additional things
 ;onto the variable S-RESULT in order to include them in the output.
-;Finally you can trigger an extraordinary exit by setting the variable 
+;Finally you can trigger an extraordinary exit by setting the variable
 ;S-CONTINUE to one of the following two values.
 ;1- COPY-REST the rest of the input arglist is copied to the output and
 ;    processing stops.
@@ -292,7 +292,7 @@
           (other `(progn ,@body))))))
 
 ; (s-process-args args other (cond ((eq mode '&sequence) var)))
-; 
+;
 ; (S-MAPCAR ARGS
 ;   (LET (KIND MODE VAR INFO)
 ;     (SETQ KIND
@@ -304,9 +304,9 @@
 ;           INFO
 ;           (S-INFO ITEM))
 ;     (PROGN (COND ((EQ MODE '&SEQUENCE) VAR)))))
-; 
+;
 ; (s-process-args args arglist (cond ((eq mode '&sequence) var)))
-; 
+;
 ; (S-MAPCAR ARGS
 ;   (LET (KIND MODE VAR INFO)
 ;     (SETQ KIND
@@ -320,34 +320,34 @@
 ;     (COND
 ;       ((PROGN (COND ((EQ MODE '&SEQUENCE) VAR)))
 ;        (S-MAKE-ARG KIND MODE VAR INFO)))))
-; 
+;
 )
 
 ;the following are some things that we assume about frags, Note that
 ;the library frags at the end have to obay these religiously!
 ;1- the args are unique in the body.  Note that an output can have the
-;   same name as a (non &rest) input as long as it is just passing along 
+;   same name as a (non &rest) input as long as it is just passing along
 ;   its value (eg filters truncators).  They will always be renamed together.
 ;2- every frag has exactly one return value
-;3- every &sequence input variable must be read at least once in the 
+;3- every &sequence input variable must be read at least once in the
 ;   code1-code2 unless both are nil.  If you have nothing useful to do with
-;   it (eg in rcount) you can just say (COMMENT (READING VAR)) to indicate 
-;   where it is logically being used.  We need to know this for filters in 
+;   it (eg in rcount) you can just say (COMMENT (READING VAR)) to indicate
+;   where it is logically being used.  We need to know this for filters in
 ;   order to know whether the code1-code2 needs to be conditionalized.
 ;4- when two frags are combined, it is OK to rename the output var of
 ;   one to be the same as the input var of the other.  To insure this and
-;   to minimize the number of variables needed we inforce the following zones 
+;   to minimize the number of variables needed we inforce the following zones
 ;   of exclusion.
 ; A- &unitary outputs can be arbitrarily referenced by the creater in icode
 ;    and cannot be referenced by him in code1-ucode.  &unitary inputs can be
 ;    arbitrarily referenced by the user in icode-ucode.
-; B- &end-unitary outputs can be arbitrarily referenced by the creater in 
+; B- &end-unitary outputs can be arbitrarily referenced by the creater in
 ;    icode-pcode and cannot be referenced in the ucode.  &end-unitary inputs
 ;    can be referenced arbitrarily but only in the pcode-ucode.
 ; C- &sequence outputs can be arbitrarily referenced in the icode-code1.
 ;    But note that their values are not guarranted to be
 ;    preserved between iterations.  They cannot be referenced in the
-;    code2-ucode.  &sequence inputs can be arbitrarily referenced in 
+;    code2-ucode.  &sequence inputs can be arbitrarily referenced in
 ;    code1-ucode.
 ;  Note that the zones of exclusion work just fine as long as each output is
 ;  used in only 1 place.  If it is used in two places that both modify it,
@@ -376,7 +376,7 @@
       (cond ((memq kind '(&input &optional &rest))
              (case mode
                (&unitary T)
-               (&end-unitary 
+               (&end-unitary
                 (or (not (s-referencesp
                           (append (s-icode frag) (s-code1 frag) (s-code2 frag))
                           (list var)))
@@ -417,7 +417,7 @@
                        (append (s-code2 frag) (s-pcode frag) (s-ucode frag))
                        (list var)))
                  (push (cons "&sequence out used in code2-ucode" var) m)))
-            (&end-unitary 
+            (&end-unitary
              (or (not (s-referencesp (s-ucode frag) (list var)))
                  (push (cons "&end-unitary out used in ucode" var) m))))))
     (cond (m (s-b "malformed fragment" m frag))
@@ -439,16 +439,14 @@
            (setq doc (pop body))))
     (cond ((s-eq-car (car body) 'declare)
            (setq dcl (pop body)))
-          (T (setq dcl `(declare))))
-    (cond ((not (assq 'arglist (cdr dcl)))
-           (setq dcl (append dcl `((arglist ., args))))))
+          (T nil))
     (let* ((ret (s-parse-it `(defunS ,name ,args ., body) 'defunS args body))
            (new-args (car ret))
            (new-body (cdr ret)))
       `(s-defuns ,name ,new-args ,doc ,dcl
           ., new-body))))
 
-;This exists so that the user can do a macroexpand-1 and see the 
+;This exists so that the user can do a macroexpand-1 and see the
 ;results after parsing.
 
 (defmacro s-defuns (name args doc dcl &body body)
@@ -580,7 +578,7 @@
   (let* ((S-INSIDE-LETS T)
          (args (s-expand-arg-list '&input compressed-args))
          (S-sequence-vars (s-process-args args other
-                            (cond ((eq mode '&sequence) var))))       
+                            (cond ((eq mode '&sequence) var))))
          (clean-args (s-process-args args arglist
                        (cond ((eq kind '&aux) (setq mode '&unitary)))
                        T))
@@ -597,7 +595,7 @@
            (args (s-expand-arg-list '&input compressed-args))
            ;; other varはどこから来ている? otherはキーワード。varは内部で使う決め打ちの名前
            #|(S-sequence-vars (s-process-args args other
-           (cond ((eq mode '&sequence) var))))|#       
+           (cond ((eq mode '&sequence) var))))|#
            ;; arglist kindはどこから来ている?
            (clean-args (s-process-args args arglist
                          (cond ((eq kind '&aux) (setq mode '&unitary)))
@@ -617,7 +615,7 @@
                     #'(lambda () (setq square (* (cdr entry) (cdr entry)))))
                   (rlist (maps #'(lambda () (list (car entry) square)))))))|#
 
-#|(s-combine (list* '&aux '&sequence '(entry square)) 
+#|(s-combine (list* '&aux '&sequence '(entry square))
            '((maps-no-ret #'(lambda (v1) (setq entry v1)) (elist alist))
              (maps-no-ret
                #'(lambda () (setq square (* (cdr entry) (cdr entry)))))
@@ -710,7 +708,7 @@
              (s-e item "extranious keyword"))
             (T item)))))
 
-;This interprets the bound variable list.  
+;This interprets the bound variable list.
 ;(Note keywords &optional &rest &aux &sequence &unitary and destructuring.)
 ;note that the user cannot directly specify the keywords
 ;&flag or &end-unitary.
@@ -757,7 +755,7 @@
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defun s-args-convert (kind mode to info)
-    (s-mapcar (s-destructure-parse to) 
+    (s-mapcar (s-destructure-parse to)
       (push (s-make-arg kind mode item info) s-argl))))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
@@ -866,7 +864,7 @@
 ;S-tokenize1 is a program that should understand macros and fexprs.
 ;It is defined below.
 
-;This checks that the number of parameters is correct, and 
+;This checks that the number of parameters is correct, and
 ;recurses to parse each of the parameters themselves.
 (EVAL-WHEN (:compile-toplevel :load-toplevel :execute)
 (defun s-parse-parameters (expr)
@@ -1024,7 +1022,7 @@
 (EVAL-WHEN (:compile-toplevel :load-toplevel :execute)
 (defun s-rename-input (param input frag)
   ;; debug mc
-  ;(print (list frag (s-args frag)))     
+  ;(print (list frag (s-args frag)))
   (setf (s-args frag)
         (s-process-args (s-args frag) arglist
           (cond ((eq var input) (setq s-continue 'copy-rest) nil)
@@ -1112,7 +1110,7 @@
 (defmacro done (&rest call)
 ;#Q(declare (arglist &rest return-values))
   "Used to exit from a loop"
-  (cond ((cdr call) `(return-from T .,(cdr call))) 
+  (cond ((cdr call) `(return-from T .,(cdr call)))
         (T `(go ,S-END))))
 
 ;I would just use the ordinary desetq, but it isn't lispm standard.
@@ -1130,7 +1128,7 @@
                (cond ((not (null (car tos)))
                       (push `(s-desetq ,(car tos) (car ,v)) body)))
                (cond ((cdr tos) (push `(setq ,v (cdr ,v)) body))))
-             `(let ((,v ,from)) ., (nreverse body))))))         
+             `(let ((,v ,from)) ., (nreverse body))))))
 
 ;This simplifies expressions of the form (apply #'thing . args).  it
 ;is included because it is essential in order to make loops compile
@@ -1200,7 +1198,7 @@
 
 ;This should be doing a macroexpand-all and a proper code walk.  Worst
 ;of all, due to the fact that macros like back-quote can cause a
-;function call to end up as not the first item in a list 
+;function call to end up as not the first item in a list
 ;{ie `(1 ,(Elist a))} we must be sensitive to sequence fn names in ALL list
 ;positions at present.
 (EVAL-WHEN (:compile-toplevel :load-toplevel :execute)
@@ -1279,7 +1277,7 @@
 ; 1. It makes it possible to define the fundamental sequence functions
 ;    which cannot be defined using the other facilities provided.
 ; 2. It makes it possible to fine tune some of the sequence functions so that
-;    they will compile more effeciently when used.  In particular we can 
+;    they will compile more effeciently when used.  In particular we can
 ;    use many fewer variables.
 ;Note that every internal var gets initialized to NIL so you don't
 ;have to do this initialization explicitly.
@@ -1617,7 +1615,7 @@
         (&sequence item) (&end-unitary bool)
   () ((setq bool (or bool item))) () () ())
 
-(defrag Ror-fast 
+(defrag Ror-fast
  "Takes the OR of a sequence of objects, (stops loop when non-NIL encountered)"
         (&sequence item) (&end-unitary bool)
   () ((cond ((setq bool item) (done item)))) () () ())
