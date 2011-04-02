@@ -112,53 +112,53 @@
         (stringp thing)
         (memq thing '(T NIL))
         (s-eq-car thing 'function)
-        ;; 謎コード 'lambdaなら(lambda ()..)をみてる感じなので分かるのだが…
-        (and (consp thing) (string-equal (car thing) #\GREEK_SMALL_LETTER_LAMDA))
         (and (s-eq-car thing 'quote) (symbolp (cadr thing)))))
   )
 
 
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  ;;Here are basic constructor/deconstructors for the key internal form:
-  ;;(S-frag args returns icode code1 code2 pcode ucode)
+  ;; Here are basic constructor/deconstructors for the key internal form:
+  ;; (S-frag args returns icode code1 code2 pcode ucode)
+
+  (defstruct (s-frag (:type list)
+                     (:conc-name :s-)
+                     :named)
+    args
+    returns
+    icode
+    code1
+    code2
+    pcode
+    ucode)
 
   (defmacro s-make-frag (a r i c1 c2 p u)
-    (s-check (list 'S-frag a r i c1 c2 p u))
-    `(s-check (list 'S-frag ,a ,r ,i ,c1 ,c2 ,p ,u)))
+    `(s-check (make-s-frag :args ,a :returns ,r :icode ,i
+                           :code1 ,c1 :code2 ,c2 :pcode ,p :ucode ,u)))
 
-(defmacro s-make-frag (a r i c1 c2 p u)
-  `(s-check (list 'S-frag ,a ,r ,i ,c1 ,c2 ,p ,u)))
+  (defmacro s-frag? (thing)
+    `(s-frag-p ,thing))
 
-(defmacro s-frag? (thing)
-  `(s-eq-car ,thing 'S-frag))
+  ;; A basic part of every fragment is its arg list.  This is a list of
+  ;; quadruples [kind mode var info]  where
+  ;; KIND is one of &INPUT &OPTIONAL &REST &AUX for inputs
+  ;;     and one of &OUTPUT &FLAG for outputs
+  ;; MODE is one of &SEQUENCE &UNITARY &END-UNITARY
+  ;;      end-unitary values are only available at the end of the loop.
+  ;; VAR is a variable (gensymed and unique in the fragment)
+  ;; INFO is the optional value for &optional and the list of controlled
+  ;;     vars for &flag.
 
-(defmacro s-args        (f) `(cadr ,f))
-(defmacro s-returns     (f) `(caddr ,f))
-(defmacro s-icode       (f) `(cadddr ,f))
-(defmacro s-code1       (f) `(car (cddddr ,f)))
-(defmacro s-code2       (f) `(cadr (cddddr ,f)))
-(defmacro s-pcode       (f) `(caddr (cddddr ,f)))
-(defmacro s-ucode       (f) `(cadddr (cddddr ,f)))
+  (defstruct (s-arg (:type list)
+                    (:conc-name :s-))
+    kind
+    mode
+    var
+    info)
 
-;A basic part of every fragment is its arg list.  This is a list of
-;quadruples [kind mode var info]  where
-;KIND is one of &INPUT &OPTIONAL &REST &AUX for inputs
-;    and one of &OUTPUT &FLAG for outputs
-;MODE is one of &SEQUENCE &UNITARY &END-UNITARY
-;     end-unitary values are only available at the end of the loop.
-;VAR is a variable (gensymed and unique in the fragment)
-;INFO is the optional value for &optional and the list of controlled
-;     vars for &flag.
+  (defmacro s-make-arg (k m v i)
+    `(make-s-arg :kind ,k :mode ,m :var ,v :info ,i)) )
 
-(defmacro s-make-arg (k m v i)
-  `(list ,k ,m ,v ,i))
-
-(defmacro s-kind (a) `(car ,a))
-(defmacro s-mode (a) `(cadr ,a))
-(defmacro s-var  (a) `(caddr ,a))
-(defmacro s-info (a) `(cadddr ,a))
-)
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
 ;these fns convert arg lists to and from compressed form.
@@ -465,12 +465,6 @@
          (new-args (car ret))
          (new-body (cdr ret)))
     `(s-lets (,@(cddr new-args)) ,@new-body)))
-
-;; test
-;(Rlist (Elist '(1 2 3 4)))
-
-#|(letS* ((l '(1 2 3 4)))
-  (print l))|#
 
 (defun square-alist (alist)
   (letS* ((entry (Elist alist))
