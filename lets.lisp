@@ -89,12 +89,10 @@
 
   ;;This is called to signal internal errors.
   (defvar S-ERROR nil "holds debugging info when error hit.")
-  (declaim (special prinendline))
-  (defvar prinendline)
 
   (defun S-B (&rest values)
     (setq S-ERROR `("Internal LetS BUG:" ., values))
-    (let (prinlevel prinlength prinendline)
+    (let (*print-level* *print-length* *print-lines*)
       (error "~a" S-ERROR)))
 
   ;;Just makes it easy to robustly test the car.
@@ -531,11 +529,9 @@
 ;system maintains S-FORM containing the outermost form which triggered
 ;the operation of the macros.
 
-(declaim (special prinendline))
-
 (defun S-E (&rest values)
   (setq S-ERROR values)
-  (let (prinlevel prinlength prinendline)
+  (let (*print-level* *print-length* *print-lines*)
     (error "~A" (format nil "~{~<~A~; ~>~}in letS form: ~%~A" S-ERROR S-FORM))))
 
 ;This does the actual parsing of an arglist and body.  It is called by
