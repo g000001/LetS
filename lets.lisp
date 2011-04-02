@@ -219,9 +219,6 @@
            (push (s-make-arg kind mode (caar list) (cadar list)) result))
           (T (push (s-make-arg kind mode (car list) nil) result)))))
 
-;; test
-;(s-expand-arg-list '&input '(foo bar baz))
-;(s-make-arg '&optional '&sequence 'foo '(bar baz))
 )
 
 ;This macro supports a usful brand of looping on lists.  It is much like
@@ -268,7 +265,7 @@
 ;2- OTHER the results of the body are themselves consed up into a list
 ;   except that NIL values are skipped.
 
-#|(defmacro s-process-args (list result . body)
+(defmacro s-process-args (list result &body body)
   `(s-mapcar ,list
      (let (kind mode var info)
        (setq kind (s-kind item)
@@ -277,50 +274,8 @@
              info (s-info item))
        ,(case result
           (arglist `(cond ((progn ., body) (s-make-arg kind mode var info))))
-          (other `(progn ., body))))))|#
-
-;; mc
-(defmacro s-process-args (list result &body body)
-  `(s-mapcar ,list
-     (let (kind mode var info)
-       (setq kind (s-kind item)
-             mode (s-mode item)
-             var (s-var item)
-             info (s-info item))
-       ,(ecase result
-          (arglist `(cond ((progn ., body) (s-make-arg kind mode var info))))
           (other `(progn ,@body))))))
 
-; (s-process-args args other (cond ((eq mode '&sequence) var)))
-;
-; (S-MAPCAR ARGS
-;   (LET (KIND MODE VAR INFO)
-;     (SETQ KIND
-;           (S-KIND ITEM)
-;           MODE
-;           (S-MODE ITEM)
-;           VAR
-;           (S-VAR ITEM)
-;           INFO
-;           (S-INFO ITEM))
-;     (PROGN (COND ((EQ MODE '&SEQUENCE) VAR)))))
-;
-; (s-process-args args arglist (cond ((eq mode '&sequence) var)))
-;
-; (S-MAPCAR ARGS
-;   (LET (KIND MODE VAR INFO)
-;     (SETQ KIND
-;           (S-KIND ITEM)
-;           MODE
-;           (S-MODE ITEM)
-;           VAR
-;           (S-VAR ITEM)
-;           INFO
-;           (S-INFO ITEM))
-;     (COND
-;       ((PROGN (COND ((EQ MODE '&SEQUENCE) VAR)))
-;        (S-MAKE-ARG KIND MODE VAR INFO)))))
-;
 )
 
 ;the following are some things that we assume about frags, Note that
@@ -458,57 +413,12 @@
 ;are coerced by wrapping letS* around them.
 
 (defmacro letS* (args &body body)
-;#Q(declare (arglist variable-value-pairs &body body))
   "Used to define a loop expression"
   (let* ((ret (s-parse-it `(letS* ,args ,@body) 'letS*
                           `(&aux &sequence ,@args) body))
          (new-args (car ret))
          (new-body (cdr ret)))
     `(s-lets (,@(cddr new-args)) ,@new-body)))
-
-(defun square-alist (alist)
-  (letS* ((entry (Elist alist))
-          (square (* (cdr entry) (cdr entry))))
-    (Rlist (list (car entry) square))))
-
-(defun square-alist (alist)
-  (s-lets (entry square)
-    (maps-no-ret #'(lambda (v1) (setq entry v1)) (elist alist))
-    (maps-no-ret
-      #'(lambda () (setq square (* (cdr entry) (cdr entry)))))
-    (rlist (maps #'(lambda () (list (car entry) square))))))
-
-(defun square-alist (alist)
-  (s-lets (entry square)
-    (maps-no-ret #'(lambda (v1) (setq entry v1)) (elist alist))
-    (maps-no-ret
-      #'(lambda () (setq square (* (cdr entry) (cdr entry)))))
-    (rlist (maps #'(lambda () (list (car entry) square))))))
-
-(defmacro s-lets (args &body body)
-  (s-make-loop (s-combine (list* '&aux '&sequence args) body)))
-
-(defun square-alist (alist)
-  (s-lets (entry square)
-    (maps-no-ret #'(lambda (#:v1) (setq entry v1)) (elist alist))
-    (maps-no-ret
-      #'(lambda () (setq #:square (* (cdr entry) (cdr entry)))))
-    (rlist (maps #'(lambda () (list (car entry) square))))))
-
-
-
-(defun square-alist (alist)
-  (s-lets (#:entry #:square)
-    (maps-no-ret #'(lambda (#:v1) (setq #:entry #:v1)) (elist alist))
-    (maps-no-ret
-      #'(lambda () (setq #:square (* (cdr #:entry) (cdr #:entry)))))
-    #|(rlist (maps #'(lambda () (list (car #:entry) #:square))))|#))
-
-;; ok
-#|(s-lets (a b) '((progn 'foo)
-                (progn 'foo)))|#
-
-#|(macroexpand '(progn 'foo))|#
 
 ;This exists so that the user can do a macroexpand-1 and see the
 ;results of parsing.
@@ -602,39 +512,6 @@
       (setf (s-args frag) (append clean-args (s-args frag)))
       frag
       )))
-
-#|(macroexpand-1 (car
-                '((maps-no-ret #'(lambda (v1) (setq entry v1)) (elist alist))
-                  (maps-no-ret
-                    #'(lambda () (setq square (* (cdr entry) (cdr entry)))))
-                  (rlist (maps #'(lambda () (list (car entry) square)))))))|#
-
-#|(s-combine (list* '&aux '&sequence '(entry square))
-           '((maps-no-ret #'(lambda (v1) (setq entry v1)) (elist alist))
-             (maps-no-ret
-               #'(lambda () (setq square (* (cdr entry) (cdr entry)))))
-             (rlist (maps #'(lambda () (list (car entry) square))))))|#
-
-
-;(print (s-expand-arg-list '&input '(&AUX &SEQUENCE A B)))
-;((&AUX &SEQUENCE A NIL) (&AUX &SEQUENCE B NIL))
-;(s-process-args '((&AUX &SEQUENCE A NIL) (&AUX &SEQUENCE B NIL))
-;    other
-;                13)
-
-;(print(list* '&aux '&sequence '(a b)))
-
-;(s-combine (list* '&aqux '&sequence '(a b)) '(('body 'boo)))
-;(s-auxify-ret '('BODY 'BOO))
-
-
-#|(
- ((&AUX &SEQUENCE A NIL) (&AUX &SEQUENCE B NIL))
- (A B)
- ((&AUX &UNITARY A NIL) (&AUX &UNITARY B NIL))
- ('BODY 'BOO))|#
-
-
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1614,5 +1491,4 @@
         (&sequence item) (&end-unitary bool)
   () ((cond ((setq bool item) (done item)))) () () ())
 
-#||||
-||||#
+;; eof
