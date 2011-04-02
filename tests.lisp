@@ -8,12 +8,12 @@
 
 (rem-all-tests)
 
-(deftest :memq.0 
+(deftest :memq.0
   (memq 'a '(a b c d))
   (a b c d))
 
 (deftest :assq.0
-  (assq 'a '((a . 1) (b . 2) (c . 3) (d . 4))) 
+  (assq 'a '((a . 1) (b . 2) (c . 3) (d . 4)))
   (a . 1))
 
 (deftest :putprop.0
@@ -90,10 +90,6 @@
   t)
 
 (deftest :s-copyable-constant.5
-  (s-copyable-constant (list #\GREEK_SMALL_LETTER_LAMDA))
-  t)
-
-(deftest :s-copyable-constant.6
   (s-copyable-constant ''a)
   t)
 
@@ -156,7 +152,7 @@
                                (&aux mode var info)
                                (&output mode var info)
                                (&flag mode var info)))
-  (mode var 
+  (mode var
    &optional (var info)
    &rest var
    &aux var
@@ -216,3 +212,86 @@
   s-pcode
   s-ucode)|#
 
+(deftest :letS.Rlist.0
+    (letS* ((x 1)
+            (y (Elist '(1 2 3 4))))
+      (Rlist (list x y)))
+  ((1 1) (1 2) (1 3) (1 4)))
+
+
+(deftest :letS.Rlist.1
+    (letS* ((x (Elist '(1 2 3 4)))
+            (y (Elist '(1 2 3 4))))
+      (Rlist (list x y)))
+  ((1 1) (2 2) (3 3) (4 4)))
+
+
+(deftest :letS.Rlist.2
+    (letS* (((x y z . ignore)
+             (Elist '((1 2 3 4)
+                      (1 2 3 4)
+                      (1 2 3 4)
+                      (1 2 3 4)
+                      (1 2 3 4))))
+            (a (Elist '(1 2 3 4))))
+      (Rlist (list x y z a)))
+  ((1 2 3 1) (1 2 3 2) (1 2 3 3) (1 2 3 4)) )
+
+(deftest :Rlist.Elist.0
+    (Rlist (Elist '(1 2 3 4)))
+  (1 2 3 4))
+
+(deftest :Rlist.Elist.0
+    (Rlist (Elist '(1 2 3 4)))
+  (1 2 3 4))
+
+(deftest :letS*.0
+    (with-output-to-string (out)
+      (letS* ((l (Elist '(1 2 3 4))))
+        (princ l out)))
+  "1234")
+
+(deftest :Rlist.mapS.0
+    (Rlist (mapS #'values (Elist '(1 2 3 4))))
+  (1 2 3 4))
+
+(deftest :Rlist.mapS.1
+  (Rlist (mapS #'1+ (Elist '(1 2 3 4))))
+  (2 3 4 5) )
+
+(deftest :Rlist.implicitmap.0
+    (Rlist (1+ (Elist '(1 2 3 4))))
+  (2 3 4 5) )
+
+
+(deftest :Rlist.implicitmap.1
+    (Rlist ((lambda (x) (1+ x)) (Elist '(1 2 3 4))))
+  (2 3 4 5) )
+
+(deftest :Rlist.implicitmap.2
+    (Rlist ((lambda (x y) (list y x))
+        (Elist '(1 2 3 4))
+        (Elist '(10 20 30 40))))
+
+  ((10 1) (20 2) (30 3) (40 4)) )
+
+(deftest :Rlist.implicitmap.3
+    (Rlist (list (Elist '(1 2 3 4))
+                 (Elist '(10 20 30 40))))
+  ((1 10) (2 20) (3 30) (4 40)) )
+
+(defun square-alist (alist)
+  (letS* (((x . y)
+           (Elist alist))
+          (z (* x y)))
+    (Rlist z)))
+
+(deftest :Rlist.defun.0
+    (square-alist '((1 . 2) (3 . 4) (5 . 6) (7 . 8)))
+  (2 12 30 56) )
+
+;; test
+;(s-expand-arg-list '&input '(foo bar baz))
+;(s-make-arg '&optional '&sequence 'foo '(bar baz))
+
+;(do-tests )
