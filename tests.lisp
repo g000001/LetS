@@ -294,4 +294,91 @@
 ;(s-expand-arg-list '&input '(foo bar baz))
 ;(s-make-arg '&optional '&sequence 'foo '(bar baz))
 
-;(do-tests )
+
+(deftest :mapS.0
+    (Rlist (mapS #'/ (Elist (list 1 2 3 4))))
+  (1 1/2 1/3 1/4) )
+
+(deftest :Ror.0
+    (Ror (Elist '(nil nil nil nil)))
+  nil )
+
+(deftest :Ror.1
+    (Ror (Elist '(nil nil nil nil)))
+  nil )
+
+(deftest :test.100
+  (Rmax (Erange 1 10))
+  10 )
+
+(deftest :test.1
+  (Rcount (Erange 1 10))
+  10 )
+
+(deftest :test.2
+    (letS* ((s (Erange 1 100))
+            (2* (* 2 s)))
+      (list
+       (Rvector (make-array 100) s)
+       (Rlist s)
+       (Rsum s)
+       (Rsum$ s)
+       (Rmin s)
+       (Rmax s)
+       (Rcount s)
+       (Rand s)
+       (Ror s)))
+  (#(1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28
+     29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53
+     54 55 56 57 58 59 60 61 62 63 64 65 66 67 68 69 70 71 72 73 74 75 76 77 78
+     79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100)
+    (1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29
+       30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55
+       56 57 58 59 60 61 62 63 64 65 66 67 68 69 70 71 72 73 74 75 76 77 78 79 80 81
+       82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100)
+    5050 5050.0 1 100 100 100 1) )
+
+
+(deftest :test.3
+    (Rappend (list (Elist '(1 2 3 4))
+                   (Elist '(1 2 3 4))))
+  (1 1 2 2 3 3 4 4) )
+
+(deftest :test.4
+  (Rlist (Fpositive (Elist '(-1 2 nil 3))))
+  (2 3) )
+
+(deftest :test.5
+  (Rlist (Fpositive (Erange -10 10)))
+  (1 2 3 4 5 6 7 8 9 10) )
+
+(deftest :test.6
+  (reduceS #'+ 0
+           (Erange -20 -10)
+           (Grange))
+  -99 )
+
+(deftest :test.7
+    (letS* ((s (Erange 1 100))
+            (p (previouS 0 (lambda (x) (* -1 x)) s)))
+      (nconc (Rlist s)
+             (Rlist (Fpositive p))))
+  (1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29
+     30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55
+     56 57 58 59 60 61 62 63 64 65 66 67 68 69 70 71 72 73 74 75 76 77 78 79 80 81
+     82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100) )
+
+(deftest :test.8
+    (Rvector (make-array 100)
+             (Erange 1 100))
+  #(1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29
+    30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55
+    56 57 58 59 60 61 62 63 64 65 66 67 68 69 70 71 72 73 74 75 76 77 78 79 80 81
+    82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100) )
+
+(deftest :test.9
+  (Rappend (list (previouS 0 #'values (Erange 1 10))
+               (Erange 1 10)))
+  (0 1 1 2 2 3 3 4 4 5 5 6 6 7 7 8 8 9 9 10) )
+
+;(do-tests)
