@@ -1400,17 +1400,6 @@
   () ((setq revplist (list* value name revplist))) ()
   ((setq revplist (cons nil (nreverse revplist)))) ())
 
-(defmacro aset (x array &rest subscripts)
-  `(setf (aref ,array ,@subscripts) ,x))
-
-#|(defrag Rvector "Stores a sequence of objects in a one dimensional array"
-        (vector &sequence element &optional &unitary (first 0)
-                (last (1- (length vector))))
-        (&end-unitary vector)
-  ()
-  ((cond ((> first last) (done)))
-   (aset element vector first))
-  ((setq first (1+ first))) () ())|#
 
 (defrag Rvector "Stores a sequence of objects in a one dimensional array"
         (vector &sequence element &optional &unitary (first 0)
@@ -1418,7 +1407,7 @@
         (&end-unitary vector)
   ()
   ((cond ((> first last) (done)))
-   (aset element vector first))
+   (setf (aref vector first) element))
   ((setq first (1+ first))) () ())
 
 
