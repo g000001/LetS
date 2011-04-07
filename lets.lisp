@@ -580,7 +580,6 @@
 ;note that the user cannot directly specify the keywords
 ;&flag or &end-unitary.
 
-(declaim (special s-argl s-code))
 (defvar s-argl)
 (defvar s-code ())
 
@@ -626,7 +625,6 @@
       (push (s-make-arg kind mode item info) s-argl))))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (declaim (special s-vars))
   (defvar s-vars ())
 
   (defun s-destructure-parse (list)
@@ -720,7 +718,6 @@
 ;   Note that this will always be at least a variable.
 ;2- A list of seq stuff args.  (Maybe none.)
 )
-(declaim (special S-token-args S-token-params))
 
 (EVAL-WHEN (:compile-toplevel :load-toplevel :execute)
   (defun s-tokenize (expr)
