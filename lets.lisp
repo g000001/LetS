@@ -934,7 +934,7 @@
                (and (s-eq-car (cadr apply) 'quote)
                     (symbolp (cadadr apply))))
            (setq fn (cadadr apply)))
-          ((and (consp (cadr apply)) (string-equal (caadr apply) #\greek_small_letter_lamda))
+          ((and (consp (cadr apply)) (string-equal (caadr apply) 'lambda))
            (setq fn (cons 'lambda (cdadr apply))))
           (T (return apply)))
     (cond ((s-eq-car apply 'funcall) (setq args (cddr apply)))
