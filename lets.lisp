@@ -864,9 +864,6 @@
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defvar S-PROG nil "the most recent loop expansion")
-  ;(defvar S-LOOP 'LETS/L0 "LETS looping label")  ;must be same on each loading!
-  ;(defvar S-END  'LETS/E0 "LETS loop end label")
-
   (defvar S-LOOP (gensym "LETS/L0") "LETS looping label")  ;must be same on each loading!
   (defvar S-END  (gensym "LETS/E0") "LETS loop end label"))
 
@@ -1342,7 +1339,9 @@
 
 (defrag Rfile "Writes a sequence of objects into a file"
         (file-name &sequence object &aux outfile finish) (&end-unitary ret)
-  ((sb-sys:without-interrupts (setq outfile (open file-name :direction :output))))
+  ((#+sbcl sb-sys:without-interrupts
+    #-sbcl progn
+           (setq outfile (open file-name :direction :output))))
   (((lambda (prinlength prinlevel) (write-line object outfile)) nil nil))
   ()
   ((setq ret T finish T))
