@@ -9,9 +9,6 @@
 ;COMPILED CODE TO RUN SO YOU ONLY HAVE TO LOAD IT FOR INTERPRETATION
 ;AND COMPILATION.
 
-;/#M(herald letS)
-;/#M(declare (macros t) (mapex T))
-
 ;The only functions intended to be used by users are: DEFUNS, LETS*,
 ;LETS, DONE, and the library sequence functions which are defined in
 ;the file LETSLB.  These functions are globalized on lispm.
@@ -79,7 +76,7 @@
 (defun-compile-time S-B (&rest values)
   (setq S-ERROR `("Internal LetS BUG:" ., values))
   (let (*print-level* *print-length* *print-lines*)
-    (error "~a" S-ERROR)))
+    (error "~A" S-ERROR)))
 
 ;Just makes it easy to robustly test the car.
 
@@ -122,15 +119,15 @@
 (defmacro s-frag? (thing)
   `(s-frag-p ,thing))
 
-;; A basic part of every fragment is its arg list.  This is a list of
-;; quadruples [kind mode var info]  where
-;; KIND is one of &INPUT &OPTIONAL &REST &AUX for inputs
-;;     and one of &OUTPUT &FLAG for outputs
-;; MODE is one of &SEQUENCE &UNITARY &END-UNITARY
-;;      end-unitary values are only available at the end of the loop.
-;; VAR is a variable (gensymed and unique in the fragment)
-;; INFO is the optional value for &optional and the list of controlled
-;;     vars for &flag.
+;A basic part of every fragment is its arg list.  This is a list of
+;quadruples [kind mode var info]  where
+;KIND is one of &INPUT &OPTIONAL &REST &AUX for inputs
+;    and one of &OUTPUT &FLAG for outputs
+;MODE is one of &SEQUENCE &UNITARY &END-UNITARY
+;     end-unitary values are only available at the end of the loop.
+;VAR is a variable (gensymed and unique in the fragment)
+;INFO is the optional value for &optional and the list of controlled
+;    vars for &flag.
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defstruct (s-arg (:type list)
@@ -389,10 +386,9 @@
 
 ;For historical compatability.
 
-(defmacro letS (args &body body)
-;  #Q(declare (arglist variable-value-pairs &body body))
+(defmacro letS (variable-value-pairs &body body)
  "Used to define a loop expression"
-  `(lets* ,args ., body))
+  `(lets* ,variable-value-pairs ., body))
 
 ;This makes a normal form fragment out of a combined fragment by:
 ;Making the flags refer only to the outputs.  Making sure each
@@ -437,41 +433,20 @@
          (cond (S-INSIDE-LETS (s-frag-apply call))
                (T (list 'lets* nil call)))))))
 
-;; orig
-#|(defun s-combine (compressed-args body)
-  (format T "Debug: compressed-args -> ~S / body -> ~S ~%" compressed-args body)
+(defun-compile-time s-combine (compressed-args body)
   (let* ((S-INSIDE-LETS T)
-         (args (s-expand-arg-list '&input compressed-args))
-         (S-sequence-vars (s-process-args args other
-                            (cond ((eq mode '&sequence) var))))
-         (clean-args (s-process-args args arglist
-                       (cond ((eq kind '&aux) (setq mode '&unitary)))
-                       T))
-         (frag (macroexpand (car body))))
+	 (args (s-expand-arg-list '&input compressed-args))
+	 (S-sequence-vars (s-process-args args other
+			    (cond ((eq mode '&sequence) var))))
+	 (clean-args (s-process-args args arglist
+		       (cond ((eq kind '&aux) (setq mode '&unitary)))
+		       T))
+	 (frag (macroexpand (car body))))
     (s-mapcar (cdr body)
       (s-auxify-ret frag)
       (setq frag (s-merge frag (macroexpand item))))
     (setf (s-args frag) (append clean-args (s-args frag)))
-    frag))|#
-
-(defun-compile-time s-combine (compressed-args body)
-    (let* ((S-INSIDE-LETS T)
-           (args (s-expand-arg-list '&input compressed-args))
-           ;; other varはどこから来ている? otherはキーワード。varは内部で使う決め打ちの名前
-           #|(S-sequence-vars (s-process-args args other
-           (cond ((eq mode '&sequence) var))))|#
-           ;; arglist kindはどこから来ている?
-           (clean-args (s-process-args args arglist
-                         (cond ((eq kind '&aux) (setq mode '&unitary)))
-                         T))
-           (frag (macroexpand-1 (car body) nil)))
-                                        ;(frag (car body)))
-      (s-mapcar (cdr body)
-        (s-auxify-ret frag)
-        (setq frag (s-merge frag (macroexpand item))))
-      (setf (s-args frag) (append clean-args (s-args frag)))
-      frag
-      ))
+    frag))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1259,11 +1234,11 @@
    (cond ((eq thing eof) (done))))
   () () ((cond (file (close file)))))|#
 
-;#+sbcl (import 'sb-sys:without-interrupts)
-
 (defrag Efile "Enumerates successive forms in a file"
         (file-name &aux file eof) (&sequence thing)
-  ((sb-sys:without-interrupts (setq file (open file-name :direction :input)))
+  ((#+sbcl sb-sys:without-interrupts
+    #-sbcl progn
+           (setq file (open file-name :direction :input)))
    (setq eof (gensym)))
   ((setq thing (read-line file nil eof))
    (cond ((eq thing eof) (done))))
@@ -1273,7 +1248,6 @@
         (&sequence integers)
         (&sequence integers &flag (f (integers)))
   () ((setq f (plusp integers))) () () ())|#
-
 
 ;; なんか説明と違うような。
 ;; (Rlist (Fpositive (Elist '(-1 2 nil 3))))
