@@ -19,100 +19,85 @@
 (in-package :lets)
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  ;; cl-utils
-  (declaim (inline memq))
-  (defun memq (item lst)
-    (member item lst :test #'eq))
+  (defvar S-token-params () )
+  (defvar S-token-args () ) )
 
-  (declaim (inline assq))
-  (defun assq (item alist)
-    (assoc item alist :test #'eq))
+(defun-compile-time GF (&rest args)
+  (format T "~{~A~^ ~}~%" (cdr args)))
 
-  (defmacro putprop (sym val prop)
-    `(setf (get ,sym ,prop) ,val))
+;;This is here for debugging only
 
-  (defmacro comment (&body body)
-    (declare (ignore body))
-    '(quote comment))
+(defun-compile-time S-frag (&rest frag)
+  (GF "{'('*_(1<*,>)A(1<*,>)+-6[<A(1<*->)>]')'}"
+      's-frag (s-compress-arg-list '&input (s-args frag))
+      (s-compress-arg-list '&output (s-returns frag)) (cdddr frag)))
 
-  ;;
+(putprop 's-frag 'Gformat 'defun)
 
-  (defun GF (&rest args)
-    "GFってなんだよ"
-    (format T "~{~A~^ ~}~%" (cdr args)))
+(defun-compile-time s-debug ()
+  (eval '(progn ;to make lispm happy
+          (defun r fexpr (form)
+                 (cond (form (setq r (car form))))
+                 (prog (f)
+                       (setq f (subst nil nil r))
+                    L (cond ((not (equal (cons (car f) (cdr f))
+                                         (setq f (macroexpand-1 f))))
+                             (cond ((s-eq-car f 'lets*) (go L)))
+                             (pl f)
+                             (cond ((Y-or-N-p "continue") (go L))))
+                            (T (return (eval f))))))
+          #|(defun (S-frag :Gformat) (frag)
+          (GF "{'('*_(1<*,>)A(1<*,>)+-6[<A(1<*->)>]')'}"
+          's-frag (s-compress-arg-list '&input (s-args frag))
+          (s-compress-arg-list '&output (s-returns frag)) (cdddr frag)))|#
 
-  ;;This is here for debugging only
+          (defun (defunS :Gformat) (expr)
+            (GF "(2*_*_(1<*,>)<A*>)" expr))
+          (defun (s-defunS :Gformat) (expr)
+            (GF "(2*_*_(1<*,>)<A*>)" expr))
+          (defun (letS :Gformat) (expr)
+            (GF "(2*_(1<*,>)<A*>)" expr))
+          (defun (letS* :Gformat) (expr)
+            (GF "(2*_(1<*,>)<A*>)" expr))
+          (defun (s-lets :Gformat) (expr)
+            (GF "(2*_(1<*,>)<A*>)" expr)))))
 
-  (defun S-frag (&rest frag)
-    (GF "{'('*_(1<*,>)A(1<*,>)+-6[<A(1<*->)>]')'}"
-        's-frag (s-compress-arg-list '&input (s-args frag))
-        (s-compress-arg-list '&output (s-returns frag)) (cdddr frag)))
-
-  (putprop 's-frag 'Gformat 'defun)
-
-  (defun s-debug ()
-    (eval '(progn ;to make lispm happy
-            (defun r fexpr (form)
-                   (cond (form (setq r (car form))))
-                   (prog (f)
-                      (setq f (subst nil nil r))
-                      L (cond ((not (equal (cons (car f) (cdr f))
-                                           (setq f (macroexpand-1 f))))
-                               (cond ((s-eq-car f 'lets*) (go L)))
-                               (pl f)
-                               (cond ((Y-or-N-p "continue") (go L))))
-                              (T (return (eval f))))))
-            #|(defun (S-frag :Gformat) (frag)
-            (GF "{'('*_(1<*,>)A(1<*,>)+-6[<A(1<*->)>]')'}"
-            's-frag (s-compress-arg-list '&input (s-args frag))
-            (s-compress-arg-list '&output (s-returns frag)) (cdddr frag)))|#
-
-            (defun (defunS :Gformat) (expr)
-              (GF "(2*_*_(1<*,>)<A*>)" expr))
-            (defun (s-defunS :Gformat) (expr)
-              (GF "(2*_*_(1<*,>)<A*>)" expr))
-            (defun (letS :Gformat) (expr)
-              (GF "(2*_(1<*,>)<A*>)" expr))
-            (defun (letS* :Gformat) (expr)
-              (GF "(2*_(1<*,>)<A*>)" expr))
-            (defun (s-lets :Gformat) (expr)
-              (GF "(2*_(1<*,>)<A*>)" expr)))))
-  )
 
+
+;This makes up a unique name.  The key requirement is that it must not
+;clash with anything at all.  These names are eliminated if possible
+;when we do simplifications.  (Eventually will be just gensym.)
+
+(defun-compile-time s-new-var (root)
+  (gensym (string root)))
+
+;This is called to signal internal errors.
+
 (eval-when (:compile-toplevel :load-toplevel :execute)
-;;This makes up a unique name.  The key requirement is that it must not
-;;clash with anything at all.  These names are eliminated if possible
-;;when we do simplifications.  (Eventually will be just gensym.)
+  (defvar S-ERROR nil "holds debugging info when error hit."))
 
-  (defun s-new-var (root)
-    (gensym (string root)))
+(defun-compile-time S-B (&rest values)
+  (setq S-ERROR `("Internal LetS BUG:" ., values))
+  (let (*print-level* *print-length* *print-lines*)
+    (error "~a" S-ERROR)))
 
-  ;;This is called to signal internal errors.
-  (defvar S-ERROR nil "holds debugging info when error hit.")
+;Just makes it easy to robustly test the car.
 
-  (defun S-B (&rest values)
-    (setq S-ERROR `("Internal LetS BUG:" ., values))
-    (let (*print-level* *print-length* *print-lines*)
-      (error "~a" S-ERROR)))
+(defmacro s-eq-car (item atom)
+  (cond ((symbolp item) `(and (consp ,item) (eq (car ,item) ,atom)))
+        (T (let* ((s-item (gensym)))
+             `(let* ((,s-item ,item)) (s-eq-car ,s-item ,atom))))))
 
-  ;;Just makes it easy to robustly test the car.
-  (defmacro s-eq-car (item atom)
-    (cond ((symbolp item) `(and (consp ,item) (eq (car ,item) ,atom)))
-          (T (let* ((s-item (gensym)))
-               `(let* ((,s-item ,item)) (s-eq-car ,s-item ,atom))))))
+;;This tests whether a thing is a variable name.
+(defun-compile-time s-variablep (thing)
+  (and thing (symbolp thing) (not (eq thing T))))
 
-  ;;This tests whether a thing is a variable name.
-  (defun s-variablep (thing)
-    (and thing (symbolp thing) (not (eq thing T))))
-
-  (defun s-copyable-constant (thing)
-    (or (numberp thing)
-        (stringp thing)
-        (memq thing '(T NIL))
-        (s-eq-car thing 'function)
-        (and (s-eq-car thing 'quote) (symbolp (cadr thing)))))
-  )
-
+(defun-compile-time s-copyable-constant (thing)
+  (or (numberp thing)
+      (stringp thing)
+      (memq thing '(T NIL))
+      (s-eq-car thing 'function)
+      (and (s-eq-car thing 'quote) (symbolp (cadr thing)))))
 
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
@@ -128,40 +113,41 @@
     code1
     code2
     pcode
-    ucode)
+    ucode) )
 
-  (defmacro s-make-frag (a r i c1 c2 p u)
-    `(s-check (make-s-frag :args ,a :returns ,r :icode ,i
-                           :code1 ,c1 :code2 ,c2 :pcode ,p :ucode ,u)))
+(defmacro s-make-frag (a r i c1 c2 p u)
+  `(s-check (make-s-frag :args ,a :returns ,r :icode ,i
+                         :code1 ,c1 :code2 ,c2 :pcode ,p :ucode ,u)))
 
-  (defmacro s-frag? (thing)
-    `(s-frag-p ,thing))
+(defmacro s-frag? (thing)
+  `(s-frag-p ,thing))
 
-  ;; A basic part of every fragment is its arg list.  This is a list of
-  ;; quadruples [kind mode var info]  where
-  ;; KIND is one of &INPUT &OPTIONAL &REST &AUX for inputs
-  ;;     and one of &OUTPUT &FLAG for outputs
-  ;; MODE is one of &SEQUENCE &UNITARY &END-UNITARY
-  ;;      end-unitary values are only available at the end of the loop.
-  ;; VAR is a variable (gensymed and unique in the fragment)
-  ;; INFO is the optional value for &optional and the list of controlled
-  ;;     vars for &flag.
+;; A basic part of every fragment is its arg list.  This is a list of
+;; quadruples [kind mode var info]  where
+;; KIND is one of &INPUT &OPTIONAL &REST &AUX for inputs
+;;     and one of &OUTPUT &FLAG for outputs
+;; MODE is one of &SEQUENCE &UNITARY &END-UNITARY
+;;      end-unitary values are only available at the end of the loop.
+;; VAR is a variable (gensymed and unique in the fragment)
+;; INFO is the optional value for &optional and the list of controlled
+;;     vars for &flag.
 
+(eval-when (:compile-toplevel :load-toplevel :execute)
   (defstruct (s-arg (:type list)
                     (:conc-name :s-))
     kind
     mode
     var
-    info)
+    info) )
 
-  (defmacro s-make-arg (k m v i)
-    `(make-s-arg :kind ,k :mode ,m :var ,v :info ,i)) )
+(defmacro s-make-arg (k m v i)
+  `(make-s-arg :kind ,k :mode ,m :var ,v :info ,i))
 
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
+
 ;these fns convert arg lists to and from compressed form.
 
-(defun s-compress-arg-list (in-out arg-list)
+(defun-compile-time s-compress-arg-list (in-out arg-list)
   (setq arg-list (sort arg-list #'kind-order :key #'car))
   (do ((kind in-out) (mode '&unitary) (result)
        (list arg-list (cdr list))) ((null list) (nreverse result))
@@ -179,31 +165,10 @@
              (push (list var info) result))
             (T (push var result))))))
 
-(defun s-compress-arg-list (in-out arg-list)
-  (setq arg-list (sort arg-list #'kind-order :key #'car))
-  (do ((kind in-out)
-       (mode '&unitary)
-       (result)
-       (list arg-list (cdr list)))
-      ((null list) (nreverse result))
-    (destructuring-bind (this-kind this-mode var info)
-                        (car list)
-      (unless (eq kind this-kind)
-        (setq kind this-kind)
-        (push kind result))
-      (unless (eq mode this-mode)
-        (setq mode this-mode)
-        (push mode result))
-      (if (memq kind '(&optional &flag))
-          (push (list var info) result)
-          (push var result)))))
-
-
-
-(defun kind-order (x y)
+(defun-compile-time kind-order (x y)
   (memq y (cdr (memq x '(&input &optional &rest &aux &output &flag)))))
 
-(defun s-expand-arg-list (in-out compressed-arg-list)
+(defun-compile-time s-expand-arg-list (in-out compressed-arg-list)
   (do ((kind in-out)
        (mode '&unitary)
        (result)
@@ -217,7 +182,6 @@
            (push (s-make-arg kind mode (caar list) (cadar list)) result))
           (T (push (s-make-arg kind mode (car list) nil) result)))))
 
-)
 
 ;This macro supports a usful brand of looping on lists.  It is much like
 ;mapcar, except that the way the body is specified is different.  It iterates
@@ -232,7 +196,7 @@
 ;2- DONE-NOW processing immediately stops with no additional output.
 ; At anytime you can do a return which stops the looping, and
 ;returns what you say.
-(eval-when (:compile-toplevel :load-toplevel :execute)
+
 (defmacro s-mapcar (list &body body)
   `(prog (s-list s-result s-continue)
          (setq s-list ,list)
@@ -274,7 +238,6 @@
           (arglist `(cond ((progn ., body) (s-make-arg kind mode var info))))
           (other `(progn ,@body))))))
 
-)
 
 ;the following are some things that we assume about frags, Note that
 ;the library frags at the end have to obay these religiously!
@@ -311,7 +274,7 @@
 ;  [Side-effects could still cause problems, and the user must
 ;  guard against destroying some other fragment's internal state.]
 
-(defun s-check (frag)
+(defun-compile-time s-check (frag)
   (let (vars first-output m)
     (or (= (length frag) 8) (push "wrong number of parts" m))
     (s-process-args (s-args frag) other
@@ -436,7 +399,7 @@
 ;sequence input is actually read.  Note we don't have to gensym
 ;the vars anymore because this happens before parsing.
 
-(defun s-normalize (frag)
+(defun-compile-time s-normalize (frag)
   (setq frag (s-variable-rename (s-rename-alist frag) frag))
   (let* ((vars (s-process-args (s-returns frag) other
                  (cond ((eq kind '&output) var)))))
@@ -457,15 +420,15 @@
 ;encountered in the outside world, or is being macroexpanded after
 ;parsing has been completed.
 
-(defvar S-SEQUENCE-VARS nil "the sequence vars in a letS")
-(defvar S-INSIDE-LETS nil "internal flag used by letS")
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defvar S-SEQUENCE-VARS nil "the sequence vars in a letS")
+  (defvar S-INSIDE-LETS nil "internal flag used by letS") )
 
-(EVAL-WHEN (:compile-toplevel :load-toplevel :execute)
-  (defmacro s-frag-for (symbol)
-    `(and (symbolp ,symbol) (get ,symbol 's-frag))))
+(defmacro s-frag-for (symbol)
+  `(and (symbolp ,symbol) (get ,symbol 's-frag)))
 
 (defmacro s-defmacro (name doc dcl frag)
-  `(progn ;'compile
+  `(progn
      (putprop ',name ,frag 's-frag)
      (defmacro ,name (&body body)
        ,@(cond (dcl (list dcl)))
@@ -491,8 +454,7 @@
     (setf (s-args frag) (append clean-args (s-args frag)))
     frag))|#
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defun s-combine (compressed-args body)
+(defun-compile-time s-combine (compressed-args body)
     (let* ((S-INSIDE-LETS T)
            (args (s-expand-arg-list '&input compressed-args))
            ;; other varはどこから来ている? otherはキーワード。varは内部で使う決め打ちの名前
@@ -509,7 +471,7 @@
         (setq frag (s-merge frag (macroexpand item))))
       (setf (s-args frag) (append clean-args (s-args frag)))
       frag
-      )))
+      ))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -520,16 +482,17 @@
 
 ;Here are some variables used during parsing
 
-(defvar S-FORM nil "holds the top form which started macro processing")
-(defvar S-PARSE nil "the most recent loop parse")
-(defvar S-USER-RENAMES nil "The mosr recent set of user var renamings")
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defvar S-FORM nil "holds the top form which started macro processing")
+  (defvar S-PARSE nil "the most recent loop parse")
+  (defvar S-USER-RENAMES nil "The mosr recent set of user var renamings") )
 
 ;This makes it easier to print error messages.  Note that all user
 ;error messages are generated during this phase.  During parsing the
 ;system maintains S-FORM containing the outermost form which triggered
 ;the operation of the macros.
 
-(defun S-E (&rest values)
+(defun-compile-time S-E (&rest values)
   (setq S-ERROR values)
   (let (*print-level* *print-length* *print-lines*)
     (error "~A" (format nil "~{~<~A~; ~>~}in letS form: ~%~A" S-ERROR S-FORM))))
@@ -543,107 +506,102 @@
 ;accessable during debugging and the like.  [We reinitialize the
 ;variable counter just to make things easier to read.]
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defun s-parse-it (S-form form arglist body)
-    (setq *gensym-counter* 0)
-    (cond ((null body) (s-e "no body")))
-    (let* ((ret (s-args-parse arglist))
-           (argl (car ret))
-           (extra-body (cadr ret)))
-      (setq S-user-renames (s-process-args argl other
-                             (cons var (copy-symbol var nil))))
-      (setq argl (sublis s-user-renames argl))
-      (setq body (cdr (s-variable-rename s-user-renames
-                                         `(progn ,@extra-body ,@body))))
-      (let* ((S-sequence-vars (s-process-args argl other
-                                (cond ((eq mode '&sequence) var)))))
-        (setq S-parse (cons (s-compress-arg-list '&input argl)
-                            (s-parse form body)))))))
+(defun-compile-time s-parse-it (S-form form arglist body)
+  (setq *gensym-counter* 0)
+  (cond ((null body) (s-e "no body")))
+  (let* ((ret (s-args-parse arglist))
+         (argl (car ret))
+         (extra-body (cadr ret)))
+    (setq S-user-renames (s-process-args argl other
+                                         (cons var (copy-symbol var nil))))
+    (setq argl (sublis s-user-renames argl))
+    (setq body (cdr (s-variable-rename s-user-renames
+                                       `(progn ,@extra-body ,@body))))
+    (let* ((S-sequence-vars (s-process-args argl other
+                                            (cond ((eq mode '&sequence) var)))))
+      (setq S-parse (cons (s-compress-arg-list '&input argl)
+                          (s-parse form body))))))
 
 ;On the Lispm, this checks to see that all of the keywords are in the
 ;right package.  It also checks that we are not using any extranious keywords.
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defun s-check-keywords (arg-list)
-    (s-mapcar arg-list
-      (cond ((memq item '(T NIL)) (s-e item "Not allowed in argument list"))
-            ((not (symbolp item)) item)
-            ((memq item '(&optional &rest &aux &sequence &unitary)) item)
-            ((string-equal item "&SEQUENCE") '&sequence)
-            ((string-equal item "&UNITARY") '&unitary)
-            ((char= (aref (string item) 0) #\&)
-             (s-e item "extranious keyword"))
-            (T item)))))
+(defun-compile-time s-check-keywords (arg-list)
+  (s-mapcar arg-list
+    (cond ((memq item '(T NIL)) (s-e item "Not allowed in argument list"))
+          ((not (symbolp item)) item)
+          ((memq item '(&optional &rest &aux &sequence &unitary)) item)
+          ((string-equal item "&SEQUENCE") '&sequence)
+          ((string-equal item "&UNITARY") '&unitary)
+          ((char= (aref (string item) 0) #\&)
+           (s-e item "extranious keyword"))
+          (T item))))
 
 ;This interprets the bound variable list.
 ;(Note keywords &optional &rest &aux &sequence &unitary and destructuring.)
 ;note that the user cannot directly specify the keywords
 ;&flag or &end-unitary.
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defvar s-argl)
+  (defvar s-code ()))
 
-(defvar s-argl)
-(defvar s-code ())
+(defun-compile-time s-args-parse (arg-list)
+  (let* (s-argl s-code (kind '&input) (mode '&unitary))
+    (s-mapcar (s-check-keywords arg-list)
+              (cond ((memq item '(&optional &rest &aux))
+                     (cond ((memq kind (memq item '(&optional &rest &aux)))
+                            (s-e arg-list "out of order keyword" item)))
+                     (setq kind item))
+                    ((memq item '(&sequence &unitary))
+                     (setq mode item))
+                    (T (let* (to info)
+                         (cond ((and (eq kind '&rest) (not (s-variablep item)))
+                                (s-e item "destructuring &rest args not supported")))
+                         (cond ((or (eq kind '&input) (not (consp item)))
+                                (setq to item info nil))
+                               (T (setq to (car item) info (cadr item))))
+                         (cond ((eq kind '&aux)
+                                (cond ((and (consp item)
+                                            (or  info (eq kind '&sequence)))
+                                       (s-arg-code to info mode)))
+                                (s-args-convert kind mode to nil))
+                               ((not (s-variablep to))
+                                (let* ((new (s-new-var 'd)))
+                                  (s-arg-code to new mode)
+                                  (s-args-convert '&aux mode to nil)
+                                  (s-args-convert kind mode new info)))
+                               (T (s-args-convert kind mode to info)))))))
+    (list (nreverse s-argl) (nreverse s-code))))
+
+(defun-compile-time s-arg-code (to from mode)
+  (let* ((set-fn (cond ((s-variablep to) 'setq) (T 's-desetq)))
+         (expr `(,set-fn ,to ,from)))
+    (cond ((eq mode '&unitary)
+           (setq expr `(at-start #'(lambda () ,expr)))))
+    (push expr s-code)))
+
+(defun-compile-time s-args-convert (kind mode to info)
+  (s-mapcar (s-destructure-parse to)
+    (push (s-make-arg kind mode item info) s-argl)))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (defun s-args-parse (arg-list)
-    (let* (s-argl s-code (kind '&input) (mode '&unitary))
-      (s-mapcar (s-check-keywords arg-list)
-        (cond ((memq item '(&optional &rest &aux))
-               (cond ((memq kind (memq item '(&optional &rest &aux)))
-                      (s-e arg-list "out of order keyword" item)))
-               (setq kind item))
-              ((memq item '(&sequence &unitary))
-               (setq mode item))
-              (T (let* (to info)
-                   (cond ((and (eq kind '&rest) (not (s-variablep item)))
-                          (s-e item "destructuring &rest args not supported")))
-                   (cond ((or (eq kind '&input) (not (consp item)))
-                          (setq to item info nil))
-                         (T (setq to (car item) info (cadr item))))
-                   (cond ((eq kind '&aux)
-                          (cond ((and (consp item)
-                                      (or  info (eq kind '&sequence)))
-                                 (s-arg-code to info mode)))
-                          (s-args-convert kind mode to nil))
-                         ((not (s-variablep to))
-                          (let* ((new (s-new-var 'd)))
-                            (s-arg-code to new mode)
-                            (s-args-convert '&aux mode to nil)
-                            (s-args-convert kind mode new info)))
-                         (T (s-args-convert kind mode to info)))))))
-      (list (nreverse s-argl) (nreverse s-code)))))
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defun s-arg-code (to from mode)
-    (let* ((set-fn (cond ((s-variablep to) 'setq) (T 's-desetq)))
-           (expr `(,set-fn ,to ,from)))
-      (cond ((eq mode '&unitary)
-             (setq expr `(at-start #'(lambda () ,expr)))))
-      (push expr s-code))))
+  (defvar s-vars ()))
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defun s-args-convert (kind mode to info)
-    (s-mapcar (s-destructure-parse to)
-      (push (s-make-arg kind mode item info) s-argl))))
+(defun-compile-time s-destructure-parse (list)
+  (let (s-vars) (s-destructure-parse1 list) (nreverse s-vars)))
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defvar s-vars ())
-
-  (defun s-destructure-parse (list)
-    (let (s-vars) (s-destructure-parse1 list) (nreverse s-vars)))
-
-  (defun s-destructure-parse1 (list)
-    (cond ((s-variablep list) (push list s-vars))
-          ((null list))
-          ((not (consp list)) (s-e list "bad argument specification"))
-          (T (s-destructure-parse1 (car list))
-             (s-destructure-parse1 (cdr list))))))
+(defun-compile-time s-destructure-parse1 (list)
+  (cond ((s-variablep list) (push list s-vars))
+        ((null list))
+        ((not (consp list)) (s-e list "bad argument specification"))
+        (T (s-destructure-parse1 (car list))
+           (s-destructure-parse1 (cdr list)))))
 
 ;This takes in the body of a letS and parses each of the forms in it.
 ;ALL user error checking occures in this phase.  Note that we don't
 ;care what the return type is (since any returns are discarded) except
 ;for the last form.
 
-(EVAL-WHEN (:compile-toplevel :load-toplevel :execute)
-(defun s-parse (form body)
+(defun-compile-time s-parse (form body)
   (maplist #'(lambda (list)
                (s-parse1 (car list)
                  (cond ((cdr list) 'none)
@@ -651,65 +609,64 @@
                        (T 'any))))
            body))
 
-(defun s-parse1 (expr type)
+(defun-compile-time s-parse1 (expr type)
   (cond ((memq expr S-sequence-vars)
-         (case type
-           (&unitary (s-e expr "Unitary argument is sequence var"))
-           (&end-unitary `(Rlast ,expr))
-           (&sequence expr)
-           (none `(Rignore-no-ret ,expr))
-           (any `(Msequence-var-out ,expr))))
-        ((or (s-copyable-constant expr) (s-variablep expr))
-         (case type
-           (&unitary expr) ;if var and AT-END we have an undetected bug
-           ((&end-unitary any) `(at-end #'(lambda () ,expr)))
-           (&sequence  `(mapS #'(lambda () ,expr)))
-           (none `(Rignore-no-ret (Gsequence ,expr)))))
-        ((and (consp expr) (s-frag-for (car expr)))
-         (let* ((ret-type (s-return-mode (s-frag-for (car expr)))))
-           (cond ((and (null ret-type) (not (eq type 'none)))
-                  (s-e expr "nested sequence function has no return value")))
-           (case type
-             (&unitary
-              (case ret-type
-                (&end-unitary (setq expr `(at-start #'(lambda () ,expr))))
-                (&sequence
-                 (s-e expr "Sequence provided where unitary value expected")))
-              (cond ((s-referencesp (list expr) S-sequence-vars)
-                     (s-e expr "Initializing code references sequence vars"))))
-             (&end-unitary
-              (case ret-type
-                (&unitary (setq expr `(Rlast (Gsequence ,expr))))
-                (&sequence (setq expr `(Rlast ,expr)))))
-             (&sequence
-              (case ret-type
-                (&unitary (setq expr `(Gsequence ,expr)))
-                (&end-unitary (s-e expr "Implicit nesting not supported"))))))
-         (s-parse-parameters expr))
-        (T (let* ((ret (s-tokenize expr)) (fn (car ret)) (params (cdr ret))
-                  (has-at-end-rets
-                   (s-mapcar params
-                     (cond ((eq (s-return-mode (s-frag-for (car item)))
-                                '&end-unitary)
-                            (return T)))))
-                  (meta-fn
-                   (case type
-                     (&unitary 'at-start)
-                     (&end-unitary (cond (has-at-end-rets 'at-end)
-                                         (T 'mapS)))
-                     (&sequence 'mapS)
-                     (none (cond (has-at-end-rets 'at-end-no-ret)
-                                 (T 'mapS-no-ret)))
-                     (any (cond (has-at-end-rets 'at-end) (T 'mapS))))))
-             (cond ((and has-at-end-rets (consp expr) (eq (car expr) 'setq)
-                         (consp (cdr expr)) (memq (cadr expr) s-sequence-vars))
-                    (s-e expr "attempt to assign at-end value to sequence var")))
-             (s-parse1 `(,meta-fn ,fn .,params) type)))))
-)
+	 (case type
+	   (&unitary (s-e expr "Unitary argument is sequence var"))
+	   (&end-unitary `(Rlast ,expr))
+	   (&sequence expr)
+	   (none `(Rignore-no-ret ,expr))
+	   (any `(Msequence-var-out ,expr))))
+	((or (s-copyable-constant expr) (s-variablep expr))
+	 (case type
+	   (&unitary expr) ;if var and AT-END we have an undetected bug
+	   ((&end-unitary any) `(at-end #'(lambda () ,expr)))
+	   (&sequence  `(mapS #'(lambda () ,expr)))
+	   (none `(Rignore-no-ret (Gsequence ,expr)))))
+	((and (consp expr) (s-frag-for (car expr)))
+	 (let* ((ret-type (s-return-mode (s-frag-for (car expr)))))
+	   (cond ((and (null ret-type) (not (eq type 'none)))
+		  (s-e expr "nested sequence function has no return value")))
+	   (case type
+	     (&unitary
+	      (case ret-type
+		(&end-unitary (setq expr `(at-start #'(lambda () ,expr))))
+		(&sequence
+		 (s-e expr "Sequence provided where unitary value expected")))
+	      (cond ((s-referencesp (ncons expr) S-sequence-vars)
+		     (s-e expr "Initializing code references sequence vars"))))
+	     (&end-unitary
+	      (case ret-type
+		(&unitary (setq expr `(Rlast (Gsequence ,expr))))
+		(&sequence (setq expr `(Rlast ,expr)))))
+	     (&sequence
+	      (case ret-type
+		(&unitary (setq expr `(Gsequence ,expr)))
+		(&end-unitary (s-e expr "Implicit nesting not supported"))))))
+	 (s-parse-parameters expr))
+	(T (let* ((ret (s-tokenize expr)) (fn (car ret)) (params (cdr ret))
+		  (has-at-end-rets
+		   (s-mapcar params
+		     (cond ((eq (s-return-mode (s-frag-for (car item)))
+				'&end-unitary)
+			    (return T)))))
+		  (meta-fn
+		   (case type
+		     (&unitary 'at-start)
+		     (&end-unitary (cond (has-at-end-rets 'at-end)
+					 (T 'mapS)))
+		     (&sequence 'mapS)
+		     (none (cond (has-at-end-rets 'at-end-no-ret)
+				 (T 'mapS-no-ret)))
+		     (any (cond (has-at-end-rets 'at-end) (T 'mapS))))))
+	     (cond ((and has-at-end-rets (consp expr) (eq (car expr) 'setq)
+			 (consp (cdr expr)) (memq (cadr expr) s-sequence-vars))
+		    (s-e expr "attempt to assign at-end value to sequence var")))
+	     (s-parse1 `(,meta-fn ,fn .,params) type)))))
+
 
 ;This returns the mode of the first return value (if any) of a frag.
-(EVAL-WHEN (:compile-toplevel :load-toplevel :execute)
-(defun s-return-mode (frag)
+(defun-compile-time s-return-mode (frag)
   (s-process-args (s-returns frag) other
     (cond ((eq kind '&output) (return mode)))))
 
@@ -717,21 +674,18 @@
 ;1- A lambda corresponding to all the top stuff down to seq-things.
 ;   Note that this will always be at least a variable.
 ;2- A list of seq stuff args.  (Maybe none.)
-)
 
-(EVAL-WHEN (:compile-toplevel :load-toplevel :execute)
-  (defun s-tokenize (expr)
-    (let* (S-token-args S-token-params (bod (s-tokenize1 expr)))
-      (cons `#'(lambda ,(nreverse S-token-args) ,bod)
-            (nreverse S-token-params)))))
+(defun-compile-time s-tokenize (expr)
+  (let* (S-token-args S-token-params (bod (s-tokenize1 expr)))
+    (cons `#'(lambda ,(nreverse S-token-args) ,bod)
+          (nreverse S-token-params))))
 
 ;S-tokenize1 is a program that should understand macros and fexprs.
 ;It is defined below.
 
 ;This checks that the number of parameters is correct, and
 ;recurses to parse each of the parameters themselves.
-(EVAL-WHEN (:compile-toplevel :load-toplevel :execute)
-(defun s-parse-parameters (expr)
+(defun-compile-time s-parse-parameters (expr)
   (let ((args (s-args (s-frag-for (car expr))))
         (params (cdr expr))
         (result (list (car expr))))
@@ -747,7 +701,6 @@
       nil)
     (cond (params (s-e expr "too many parameters")))
     (nreverse result)))
-)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;                                                                       ;;;
@@ -756,8 +709,8 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;this creates a frag from a frag application.
-(EVAL-WHEN (:compile-toplevel :load-toplevel :execute)
-(defun s-frag-apply (call)
+
+(defun-compile-time s-frag-apply (call)
   (let* ((name (car call))
          (params (cdr call))
          (frag (s-handle-optional-and-rest
@@ -774,30 +727,30 @@
                      (frag? (setq params-frag param)))))))
     (cond (params-frag (setq frag (s-merge params-frag frag))))
     frag))
-)
+
 ;This conses up a new fragment with new unique arg names.  It depends on the
 ;fact that the old args are already unique and therefore aren't bound anywhere
 ;or anything.  It forces total copying to protect the prototypes.
 ;Note extra work may have to be done because some output may be the same name
 ;as an input.
-(EVAL-WHEN (:compile-toplevel :load-toplevel :execute)
-(defun s-uniquize (frag)
+
+(defun-compile-time s-uniquize (frag)
   (sublis (s-rename-alist frag) (subst nil nil frag)))
 
-(defun s-rename-alist (frag)
+(defun-compile-time s-rename-alist (frag)
   (let ((renames (s-process-args (s-args frag) other
                    (cons var (s-new-var var)))))
     (s-process-args (s-returns frag) other
       (cond ((not (assq var renames))
              (push (cons var (s-new-var var)) renames))))
     renames))
-)
+
 
 ;This takes care of optional arguments in the frag which is going to
 ;be applied.  (Note that error checking for number and type of args happens
 ;in s-parse.)
-(EVAL-WHEN (:compile-toplevel :load-toplevel :execute)
-(defun s-handle-optional-and-rest (frag params)
+
+(defun-compile-time s-handle-optional-and-rest (frag params)
   (let* (rest-var new-rest-vars)
     (setf (s-args frag)
           (s-process-args (s-args frag) arglist
@@ -824,12 +777,11 @@
       (cond (rest-var
              (setq frag (subst `(list ., new-rest-vars) rest-var frag))))
       frag))
-)
 
 ;This combines an input parameter into a fragment.
 ;Note comments (near s-check) on why so much renaming is ok.
-(EVAL-WHEN (:compile-toplevel :load-toplevel :execute)
-(defun s-handle-input (param input frag)
+
+(defun-compile-time s-handle-input (param input frag)
   (cond ((s-frag? param)
          (s-rename-input (s-auxify-ret param) input frag))
         ((and (or (s-variablep param) (s-copyable-constant param))
@@ -847,9 +799,8 @@
                           (setq s-continue 'copy-rest)))
                    T))
            frag)))
-)
-(EVAL-WHEN (:compile-toplevel :load-toplevel :execute)
-(defun s-auxify-ret (frag)
+
+(defun-compile-time s-auxify-ret (frag)
   (let (ret)
     (setf (s-returns frag)
           (s-process-args (s-returns frag) arglist
@@ -860,16 +811,16 @@
                                 (s-args frag))))
                    nil)
                   (T T))))
-    ret)))
+    ret))
 
-(EVAL-WHEN (:compile-toplevel :load-toplevel :execute)
-(defun s-var-in-args (v args)
+
+(defun-compile-time s-var-in-args (v args)
   (s-process-args args other
-    (cond ((eq v var) (return T))))))
+    (cond ((eq v var) (return T)))))
 
 ;This puts a setq in the right place to get the source into the indicated var.
-(EVAL-WHEN (:compile-toplevel :load-toplevel :execute)
-(defun s-make-interface (var mode source frag)
+
+(defun-compile-time s-make-interface (var mode source frag)
   (let* ((set `(setq ,var ,source)))
     (case mode
       (&unitary (push set (s-icode frag)))
@@ -880,22 +831,20 @@
               (push set (s-code2 frag)))
              (T (push set (s-code1 frag)))))
       (&end-unitary (push set (s-pcode frag))))
-    frag)))
+    frag))
 
 ;This renames an input to a thing.
-(EVAL-WHEN (:compile-toplevel :load-toplevel :execute)
-(defun s-rename-input (param input frag)
+(defun-compile-time s-rename-input (param input frag)
   ;; debug mc
   ;(print (list frag (s-args frag)))
   (setf (s-args frag)
         (s-process-args (s-args frag) arglist
           (cond ((eq var input) (setq s-continue 'copy-rest) nil)
                 (T T))))
-  (subst param input frag)))
+  (subst param input frag))
 
 ;This merges two frags together.
-(EVAL-WHEN (:compile-toplevel :load-toplevel :execute)
-(defun s-merge (fraga fragb)
+(defun-compile-time s-merge (fraga fragb)
   (let* ((fragb-sequence-out
           (append (s-mapcar S-sequence-vars
                     (cond ((or (s-writesp (s-code1 fragb) (list item))
@@ -928,7 +877,7 @@
                  (append (s-code1 fraga) (s-code1 fragb))
                  (append (s-code2 fraga) (s-code2 fragb))
                  (append (s-pcode fraga) (s-pcode fragb))
-                 (append (s-ucode fraga) (s-ucode fragb))))))
+                 (append (s-ucode fraga) (s-ucode fragb)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;                                                                       ;;;
@@ -938,18 +887,19 @@
 
 ;These hold gensym'ed constants used below
 
-(defvar S-PROG nil "the most recent loop expansion")
-;(defvar S-LOOP 'LETS/L0 "LETS looping label")  ;must be same on each loading!
-;(defvar S-END  'LETS/E0 "LETS loop end label")
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defvar S-PROG nil "the most recent loop expansion")
+  ;(defvar S-LOOP 'LETS/L0 "LETS looping label")  ;must be same on each loading!
+  ;(defvar S-END  'LETS/E0 "LETS loop end label")
 
-(defvar S-LOOP (gensym "LETS/L0") "LETS looping label")  ;must be same on each loading!
-(defvar S-END  (gensym "LETS/E0") "LETS loop end label")
+  (defvar S-LOOP (gensym "LETS/L0") "LETS looping label")  ;must be same on each loading!
+  (defvar S-END  (gensym "LETS/E0") "LETS loop end label"))
 
 ;This function creates a loop for a fragment.  Nested inputs are an
 ;error.  Due to the let fixnum variable bug, we use ugly nested progs
 ;for the unwind-protect stuff.
 
-(defun s-make-loop (frag)
+(defun-compile-time s-make-loop (frag)
   (setq frag (s-apply-simplification frag))
   (let* (bod (vars (s-process-args (s-args frag) other var))
          (rets (s-process-args (s-returns frag) other
@@ -998,7 +948,7 @@
 ;function to locate the instances of APPLY and FUNCALL.  This helping
 ;function should know about fexprs and macros.
 
-(defun s-apply-simplification (frag)
+(defun-compile-time s-apply-simplification (frag)
   (s-find-applies (s-icode frag))
   (s-find-applies (s-code1 frag))
   (s-find-applies (s-code2 frag))
@@ -1006,7 +956,7 @@
   (s-find-applies (s-ucode frag))
   frag)
 
-(defun s-simplify-apply (apply)
+(defun-compile-time s-simplify-apply (apply)
   (prog (new-expr fn args)
     (cond ((or (s-eq-car (cadr apply) 'function)
                (and (s-eq-car (cadr apply) 'quote)
@@ -1063,40 +1013,39 @@
 ;function call to end up as not the first item in a list
 ;{ie `(1 ,(Elist a))} we must be sensitive to sequence fn names in ALL list
 ;positions at present.
-(EVAL-WHEN (:compile-toplevel :load-toplevel :execute)
-  (defun s-tokenize1 (thing)
-    (cond ((or (not (consp thing))
-               (memq (car thing) '(quote function letS letS*))) thing)
-          (T (do ((exprs thing (cdr exprs))
-                  (result nil (cons (s-tokenize1 (car exprs)) result)))
-                 ((not (consp exprs)) (nreconc result exprs))
-               (cond ((and (consp exprs) (s-frag-for (car exprs)))
-                      (push exprs S-token-params)
-                      (push (s-new-var 'V) S-token-args)
-                      (return (nreconc result (car S-token-args))))))))))
+
+(defun-compile-time s-tokenize1 (thing)
+  (cond ((or (not (consp thing))
+             (memq (car thing) '(quote function letS letS*))) thing)
+        (T (do ((exprs thing (cdr exprs))
+                (result nil (cons (s-tokenize1 (car exprs)) result)))
+               ((not (consp exprs)) (nreconc result exprs))
+             (cond ((and (consp exprs) (s-frag-for (car exprs)))
+                    (push exprs S-token-params)
+                    (push (s-new-var 'V) S-token-args)
+                    (return (nreconc result (car S-token-args)))))))))
 
 ;this fn takes in an alist indicating variable renamings and performs them
 ;all on a frag.  It can take advantage of the fact that the new names are
 ;guarranteed to be unique gensyms.  However the sources may not.  It should
 ;be checking that it is only changing references to these variables, not
 ;function calls with the same name and quoted constants etc.
-(EVAL-WHEN (:compile-toplevel :load-toplevel :execute)
- (defun s-variable-rename (alist frag)
-  (sublis alist frag)))
+
+(defun-compile-time s-variable-rename (alist frag)
+  (sublis alist frag))
 
 ;this looks at the car of every list to see if it is apply or funcall
-(EVAL-WHEN (:compile-toplevel :load-toplevel :execute)
-  (defun s-find-applies (exprs)
+
+(defun-compile-time s-find-applies (exprs)
   (do ((e exprs (cdr e))) ((not (consp e)))
     (cond ((or (not (consp (car e))) (memq (caar e) '(quote function))))
           (T (prog ()
-               L (cond ((and (consp (car e)) (memq (caar e) '(apply funcall)))
-                        (let ((new (s-simplify-apply (car e))))
-                          (cond ((not (eq new (car e)))
-                                 (rplaca e new)
-                                 (go L)))))))
+                L (cond ((and (consp (car e)) (memq (caar e) '(apply funcall)))
+                         (let ((new (s-simplify-apply (car e))))
+                           (cond ((not (eq new (car e)))
+                                  (rplaca e new)
+                                  (go L)))))))
              (s-find-applies (car e))))))
-  )
 
 ;these are little utilities for detecting what variables are
 ;referenced.  Note the way it assumes every instance of a symbol is a
@@ -1105,19 +1054,19 @@
 ;trouble.  Note that the first arg to each of these must be a list of
 ;forms and the second arg must be a list of variables.
 
-(defun s-readsp (forms vars)
+(defun-compile-time s-readsp (forms vars)
   (and vars (s-mapcar forms (cond ((s-r1 item T nil vars) (return T))))))
 
-(defun s-writesp (forms vars)
+(defun-compile-time s-writesp (forms vars)
   (and vars (s-mapcar forms (cond ((s-r1 item nil T vars) (return T))))))
 
-(defun s-referencesp (forms vars)
+(defun-compile-time s-referencesp (forms vars)
   (and vars (s-mapcar forms (cond ((s-r1 item T T vars) (return T))))))
 
 ;Note that it is vitally important that this function thinks that
 ;(COMMENT (READING VAR)) is a read of VAR.
 
-(defun s-r1 (form read? write? vars)
+(defun-compile-time s-r1 (form read? write? vars)
   (cond ((and read? (memq form vars)) T)
         ((or (not (consp form)) (s-eq-car form 'quote)) nil)
         ((memq (car form) '(setq psetq))
