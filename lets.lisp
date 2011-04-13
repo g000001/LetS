@@ -970,11 +970,9 @@
                            (cons (cdr item) (car item)))
                          s-prog))))
 
-;; wakanne
-(defmacro done (&rest call)
-;#Q(declare (arglist &rest return-values))
+(defmacro done (&rest return-values)
   "Used to exit from a loop"
-  (cond ((cdr call) `(return-from T .,(cdr call)))
+  (cond ((cdr return-values) `(return-from T .,(cdr return-values)))
         (T `(go ,S-END))))
 
 ;I would just use the ordinary desetq, but it isn't lispm standard.
