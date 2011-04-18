@@ -1,10 +1,15 @@
 (in-package :cl)
 (defpackage :lets-tests
-  (:use :cl :lets :rtest))
+  (:use :cl :lets :rtest)
+  (:import-from :lets
+                . #.(let (ans)
+                      (do-symbols (s :lets)
+                        (when (eq (symbol-package s)
+                                  (find-package :lets))
+                          (push (make-symbol (string s)) ans)))
+                      ans)))
 
 (in-package :lets-tests)
-
-(do-symbols (s :lets) (shadowing-import s))
 
 (rem-all-tests)
 
