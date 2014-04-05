@@ -36,7 +36,7 @@
           (defun r fexpr (form)
                  (cond (form (setq r (car form))))
                  (prog (f)
-                       (setq f (subst nil nil r))
+                       (setq f (copy-tree r))
                     L (cond ((not (equal (cons (car f) (cdr f))
                                          (setq f (macroexpand-1 f))))
                              (cond ((s-eq-car f 'lets*) (go L)))
@@ -197,7 +197,7 @@
 (defmacro s-mapcar (list &body body)
   `(prog (s-list s-result s-continue)
          (setq s-list ,list)
-       L (cond ((null s-list) (setq s-continue 'done-now)))
+    L    (cond ((null s-list) (setq s-continue 'done-now)))
          (case s-continue
            (copy-rest (let ((res (revappend s-result s-list)))
                         (return res)))
@@ -424,11 +424,12 @@
   `(and (symbolp ,symbol) (get ,symbol 's-frag)))
 
 (defmacro s-defmacro (name doc dcl frag)
+  (declare (ignore dcl doc))
   `(progn
      (putprop ',name ,frag 's-frag)
      (defmacro ,name (&body body)
-       ,@(cond (dcl (list dcl)))
-       ,@(cond (doc (list doc)))
+       ;; ,@(cond (dcl (list dcl)))
+       ;; ,@(cond (doc (list doc)))
        (let ((call (cons ',name body)))
          (cond (S-INSIDE-LETS (s-frag-apply call))
                (T (list 'lets* nil call)))))))
@@ -643,7 +644,7 @@
 ;This returns the mode of the first return value (if any) of a frag.
 (defun-compile-time s-return-mode (frag)
   (s-process-args (s-returns frag) other
-    (cond ((eq kind '&output) (return mode)))))
+    (cond ((eq kind '&output) (return-from nil mode)))))
 
 ;this takes in an expr and returns a cons of:
 ;1- A lambda corresponding to all the top stuff down to seq-things.
@@ -710,7 +711,7 @@
 ;as an input.
 
 (defun-compile-time s-uniquize (frag)
-  (sublis (s-rename-alist frag) (subst nil nil frag)))
+  (sublis (s-rename-alist frag) (copy-tree frag)))
 
 (defun-compile-time s-rename-alist (frag)
   (let ((renames (s-process-args (s-args frag) other
@@ -1223,13 +1224,15 @@
       (setq element (aref vector first)))
      ((setq first (1+ first))) () ())
 
-#|(defrag Efile "Enumerates successive forms in a file"
+(defrag Efile-read "Enumerates successive forms in a file"
         (file-name &aux file eof) (&sequence thing)
-  ((without-interrupts (setq file (open file-name 'in)))
+  ((#+sbcl sb-sys:without-interrupts
+    #-sbcl progn
+           (setq file (open file-name :direction :input)))
    (setq eof (gensym)))
-  ((setq thing (read file eof))
+  ((setq thing (read file nil eof))
    (cond ((eq thing eof) (done))))
-  () () ((cond (file (close file)))))|#
+  () () ((cond (file (close file)))))
 
 (defrag Efile "Enumerates successive forms in a file"
         (file-name &aux file eof) (&sequence thing)
