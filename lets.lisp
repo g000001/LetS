@@ -424,12 +424,12 @@
   `(and (symbolp ,symbol) (get ,symbol 's-frag)))
 
 (defmacro s-defmacro (name doc dcl frag)
-  (declare (ignore dcl doc))
+  (declare (ignore dcl))
   `(progn
      (putprop ',name ,frag 's-frag)
      (defmacro ,name (&body body)
        ;; ,@(cond (dcl (list dcl)))
-       ;; ,@(cond (doc (list doc)))
+       ,@(cond (doc (list doc)))
        (let ((call (cons ',name body)))
          (cond (S-INSIDE-LETS (s-frag-apply call))
                (T (list 'lets* nil call)))))))
